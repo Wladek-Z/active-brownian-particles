@@ -1,56 +1,19 @@
+"""
+This file contains code that I've written, but eventually decided not to use in my final simulation (e.g. code for 3D system, keyvalue class for argparser).
+"""
+
 import numpy as np
 from numba import njit
 import matplotlib.pyplot as plt
 import scienceplots
 from scipy.stats import uniform_direction
 import argparse
-import random
 
 plt.style.use('science')
 plt.rcParams['text.usetex'] = False
 
 @njit
-def run(N, r, e, v, mu, dt, T, w):
-    """
-    Run the simulation for T timesteps and keep track of positions and orientations.
-
-    Arguments:
-        N: number of particles
-        r: particle positions
-        e: particle orientations
-        v: ABP velocity
-        mu: ABP mobility
-        dt: timestep
-        T: total number of timesteps
-        w: width of the channel
-
-    Returns:
-        pos_H: history of positions
-        pos_O: history of orientations
-    """
-    # Initialise arrays to keep track of position/orientation data
-    pos_H = np.zeros((T+1, N, 2))
-    pos_O = np.zeros((T+1, N, 2))
-    # Store position and orientation of each particle
-    for j in range(N):
-        for k in range(2):
-            pos_H[0, j, k] = r[j, k]
-            pos_O[0, j, k] = e[j, k]
-    # Perform T iterations of the update procedure
-    for i in range(1, T+1):
-        # Update position and orientation
-        r_old = r.copy()
-        e_old = e.copy()
-        r, e = update(N, r_old, e_old, v, mu, dt, w)
-        # Store position and orientation of each particle
-        for j in range(N):
-            for k in range(2):
-                pos_H[i, j, k] = r[j, k]
-                pos_O[i, j, k] = e[j, k]
-    return pos_H, pos_O   
-
-@njit
-def update(N, r, e, v, mu, dt, w):
+def update(N, r, e, v, dt, d):
         """
         Update the positions and orientations of each particle.
         
@@ -59,9 +22,8 @@ def update(N, r, e, v, mu, dt, w):
             r: particle positions
             e: particle orientations
             v: ABP velocity
-            mu: ABP mobility
             dt: timestep
-            w: width of the channel
+            d: dimensionality of the system
 
         Returns:
             r_new: updated positions
@@ -69,51 +31,45 @@ def update(N, r, e, v, mu, dt, w):
         """
         r_new = np.zeros_like(r)
         e_new = np.zeros_like(e)
-        # Initialise critical distance to obstacles
-        d_crit = 2**(1/6)
         # Iterate over every particle
         for i in range(N):
             # Generate positional noise term
-            r_noise = np.random.normal(0, 1, 2)
+            r_noise = np.random.normal(0, 1, d)
             # Update position via forward difference scheme
             r_new[i] = r[i] + v * dt * e[i] + np.sqrt(2 * dt) * r_noise
-            # Initialise correction due to repulsive interactions with obstacles
-            correction = np.zeros(2)
-            # Check for obstacles
-            if r[i, 0] < d_crit:
-                # Add repulsive interaction due to left wall
-                sep = np.array([r[i, 0], 0])
-                correction += repulsion(sep)
-            if r[i, 1] < d_crit:
-                # Add repulsive interaction due to lower wall
-                sep = np.array([0, r[i, 1]])
-                correction += repulsion(sep)
-            if (r[i, 1] - w) < d_crit:
-                # Add repulsive interaction due to upper wall
-                sep = np.array([0, (r[i, 1] - w)])
-                correction += repulsion(sep)
-            r_new[i] += dt * mu * correction
-            # Update orientation
-            e_new[i] = orientation(e[i], dt)
+            # Update orientation via dimensionally-dependent formula
+            if d == 3:
+                e_new[i] = orientation_3d(e[i], dt)
+            else:
+                e_new[i] = orientation_2d(e[i], dt)
         # Return updated position and orientation vectors
         return r_new, e_new
 
 @njit
-def repulsion(r):
+def orientation_3d(e, dt):
     """
-    Calculate correction due to repulsive interactions with obstactle.
+    Calculate and return the new orientation vector in 3D using the rodrigues formula.
     
     Arguments:
-        r: separation vector from particle to obstacle
+        e: original orientation vector
+        dt: timestep
     
     Returns:
-        repulsive force acting on particle
+        the updated orientation 
     """
-    r_mag = np.linalg.norm(r)
-    return 24 * (2 / r_mag**14 - 1 / r_mag**8) * r
+    # Generate noise term
+    noise = np.random.normal(0, 1, 3)
+    # Calculate rotation vector
+    rot_vec = np.sqrt(2 * dt) * noise
+    # Calculate angle of rotation
+    theta = np.linalg.norm(rot_vec)
+    # Calculate axis of rotation
+    k = rot_vec / theta
+    # Return updated orientation vector
+    return e * np.cos(theta) + np.cross(k, e) * np.sin(theta) + k * np.dot(k, e) * (1 - np.cos(theta))
 
 @njit
-def orientation(e, dt):
+def orientation_2d(e, dt):
     """
     Calculate and return the new orientation vector in 2D via rotation matrix update.
     
@@ -136,74 +92,86 @@ def orientation(e, dt):
     return np.array([np.cos(new_theta), np.sin(new_theta)])
 
 @njit
-def positions(N, width):
+def run(N, r, e, v, dt, T, d):
     """
-    Generate the positions of N particles near the beginning of a channel.
-    
+    Run the simulation for T timesteps and keep track of positions and orientations.
+
     Arguments:
         N: number of particles
-        width: width of channel
-    
+        r: particle positions
+        e: particle orientations
+        v: ABP velocity
+        dt: timestep
+        T: total number of timesteps
+        d: dimensionality of the system
+
     Returns:
-        r: positions of each particle
+        pos_H: history of positions
+        pos_O: history of orientations
     """
-    x_min = 2**(1/6)
-    x_max = 0.5 * width
-    y_min = 2**(1/6)
-    y_max = width - 2**(1/6)
-    # Initialise positions
-    r = np.zeros((N, 2))
-    # Randomly choose x and y components within specified range
-    for i in range(N):
-        r[i, 0] = random.uniform(x_min, x_max)
-        r[i, 1] = random.uniform(y_min, y_max)
-    # Return position array
-    return r
+    # Initialise arrays to keep track of position/orientation data
+    pos_H = np.zeros((T+1, N, 3))
+    pos_O = np.zeros((T+1, N, 3))
+    # Store position and orientation of each particle
+    for j in range(N):
+        for k in range(d):
+            pos_H[0, j, k] = r[j, k]
+            pos_O[0, j, k] = e[j, k]
+    # Perform T iterations of the update procedure
+    for i in range(1, T+1):
+        # Update position and orientation
+        r_old = r.copy()
+        e_old = e.copy()
+        r, e = update(N, r_old, e_old, v, dt, d)
+        # Store position and orientation of each particle
+        for j in range(N):
+            for k in range(d):
+                pos_H[i, j, k] = r[j, k]
+                pos_O[i, j, k] = e[j, k]
+    return pos_H, pos_O    
 
 
 class ABP:
     """
-    An ensemble of active Brownian particles submerged in fluid, for a given system geometry (2D).
+    An ensemble of active Brownian particle submerged in a fluid with zero flow profile.
+    Can be tested in either 2D or 3D.
     """
 
-    def __init__(self, N, dt, width):
+    def __init__(self, N, dt, d):
         """
         Initialise N realisations of the same particle at the origin with random orientations.
         
         Arguments:
             N: number of realisations of the particle
             dt: timestep
-            width: width of the channel
+            d: dimensionality of the system
         """
-        # Initialise variables
         self.N = N
         self.dt = dt
-        self.width = width
+        self.dim = d
         # Initialise orientation vector of each particle from a uniform rotationally symmetric distribution
-        distribution = uniform_direction(2)
+        distribution = uniform_direction(d)
         self.e = distribution.rvs(N)
         # Initialise positions
-        self.r = positions(N, width)
-        
- 
-    def Run(self, v, mu, T, MSD, trajectory):
+        self.r = np.zeros([N, d])
+
+    def Run(self, v, T, MSD, trajectory):
         """
         Run the simulation and display the desired results.
         
         Arguments:
             v: ABP velocity
-            mu: ABP mobility
             T: total number of timesteps
             MSD: display mean square displacement
             trajectory: display trajectory
         """
         # Run simulation and retrieve data
-        pos, orient = run(self.N, self.r, self.e, v, mu, self.dt, T, self.width)
+        pos, orient = run(self.N, self.r, self.e, v, self.dt, T, self.dim)
         # Calculate and display mean square displacement
         if MSD:
             self.MSD(pos, v, T)
         # Calculate and display trajectories
-        if trajectory:
+        if trajectory and (self.dim == 2):
             self.Trajectory(pos)
 
 
@@ -224,15 +192,13 @@ class ABP:
 
         # Create array of timesteps
         t = np.arange(1, T + 1) * self.dt
-        # System is 2-dimensional
-        d = 2
         # Calculate persistence time
-        tau = 1 / (d - 1)
+        tau = 1 / (self.dim - 1)
         # Theoretical mean square displacement
-        msd_theory = 2 * d * t + 2 * v**2 * tau * t - 2 * v**2 * tau**2 * (1 - np.exp(-t / tau))
+        msd_theory = 2 * self.dim * t + 2 * v**2 * tau * t - 2 * v**2 * tau**2 * (1 - np.exp(-t / tau))
         # Theoretical msd for ballistic and diffusive regimes
-        msd_b = v**2 * t**2 + 2 * d * t
-        msd_d = (2 * d + 2 * v**2 * tau) * t 
+        msd_b = v**2 * t**2 + 2 * self.dim * t
+        msd_d = (2 * self.dim + 2 * v**2 * tau) * t 
 
         fig = plt.figure(figsize=[8, 6])
         plt.title(f"Mean Square Displacement")
@@ -261,27 +227,41 @@ class ABP:
         for i in range(self.N):
             x, y = data[:, i, 0], data[:, i, 1]
             plt.plot(x, y, color='black')
-
+        
         plt.xlabel(r"$x$ position [$\sigma$]")
         plt.ylabel(r"$y$ position [$\sigma$]")
-        plt.xlim(0)
-        plt.ylim(0, self.width)
         plt.tight_layout()
         plt.show()
+
+
+# Create a key value class
+class keyvalue(argparse.Action):
+    # Constructor calling
+    def __call__( self , parser, namespace,
+                 values, option_string = None):
+        setattr(namespace, self.dest, dict())
+        
+        for value in values:
+            # Split it into key and value
+            key, value = value.split('=')
+            if key == 'wall':
+                value = float(value)
+            # Assign into dictionary
+            getattr(namespace, self.dest)[key] = value
+
 
 
 if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('-N', type=int, default=1, help='Number of realisations of the ABP')
-    parser.add_argument('-dt', type=float, default=0.001, help='Simulation timestep')
-    parser.add_argument('--MSD', action='store_true', help='Find the mean square displacement')
-    parser.add_argument('--trajectory', action='store_true', help='Find the particle trajectory')
-    parser.add_argument('-t', type=int, default=100000, help='Number of timesteps over which to run the simulation')
-    parser.add_argument('-v', type=float, default=10, help='ABP velocity')
-    parser.add_argument('-mu', type=float, default=10, help='ABP mobility')
-    parser.add_argument('-w', default=10, type=float, help='Width of channel')
+    parser.add_argument('-dt', type=float, default=0.01, help='Simulation timestep')
+    parser.add_argument('-MSD', action='store_true', help='Find the mean square displacement')
+    parser.add_argument('-trajectory', action='store_true', help='Find the particle trajectory')
+    parser.add_argument('-t', type=int, default=10000, help='Number of timesteps over which to run the simulation')
+    parser.add_argument('-v', type=float, default=1, help='ABP velocity')
+    parser.add_argument('-d', choices=[2, 3], type=int, default=2, help='Dimensionality of the system')
     args = parser.parse_args()
 
-    abp = ABP(args.N, args.dt, args.w)
-    abp.Run(args.v, args.mu, args.t, args.MSD, args.trajectory)
+    abp = ABP(args.N, args.dt, args.d)
+    abp.Run(args.v, args.t, args.MSD, args.trajectory)
