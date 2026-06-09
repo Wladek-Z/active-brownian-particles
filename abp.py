@@ -10,7 +10,7 @@ plt.style.use('science')
 plt.rcParams['text.usetex'] = False
 
 @njit
-def run(N, r, e, v, mu, dt, T, w):
+def run(N, r, e, v, mu, dt, T, w, U):
     """
     Run the simulation for T timesteps and keep track of positions and orientations.
 
@@ -23,6 +23,7 @@ def run(N, r, e, v, mu, dt, T, w):
         dt: timestep
         T: total number of timesteps
         w: width of the channel
+        U: maximum flow velocity
 
     Returns:
         pos_H: history of positions
@@ -41,7 +42,7 @@ def run(N, r, e, v, mu, dt, T, w):
         # Update position and orientation
         r_old = r.copy()
         e_old = e.copy()
-        r, e = update(N, r_old, e_old, v, mu, dt, w)
+        r, e = update(N, r_old, e_old, v, mu, dt, w, U)
         # Store position and orientation of each particle
         for j in range(N):
             for k in range(2):
@@ -50,7 +51,7 @@ def run(N, r, e, v, mu, dt, T, w):
     return pos_H, pos_O   
 
 @njit
-def update(N, r, e, v, mu, dt, w):
+def update(N, r, e, v, mu, dt, w, U):
         """
         Update the positions and orientations of each particle.
         
@@ -62,6 +63,7 @@ def update(N, r, e, v, mu, dt, w):
             mu: ABP mobility
             dt: timestep
             w: width of the channel
+            U: maximum flow velocity
 
         Returns:
             r_new: updated positions
@@ -73,10 +75,14 @@ def update(N, r, e, v, mu, dt, w):
         d_crit = 2**(1/6)
         # Iterate over every particle
         for i in range(N):
+            # Compute active velocity term
+            r_active = v * dt * e[i]
             # Generate positional noise term
-            r_noise = np.random.normal(0, 1, 2)
+            r_noise = np.sqrt(2 * dt) * np.random.normal(0, 1, 2)
             # Update position via forward difference scheme
-            r_new[i] = r[i] + v * dt * e[i] + np.sqrt(2 * dt) * r_noise
+            r_new[i] = r[i] + r_active + r_noise
+            # Incorporate correction due to fluid flow
+            r_new[i, 0] += dt * 4 * U * r[i, 1] / w * (1 - r[i, 1] / w)
             # Initialise correction due to repulsive interactions with obstacles
             correction = np.zeros(2)
             # Check for obstacles
@@ -88,13 +94,13 @@ def update(N, r, e, v, mu, dt, w):
                 # Add repulsive interaction due to lower wall
                 sep = np.array([0, r[i, 1]])
                 correction += repulsion(sep)
-            if (r[i, 1] - w) < d_crit:
+            if (w - r[i, 1]) < d_crit:
                 # Add repulsive interaction due to upper wall
                 sep = np.array([0, (r[i, 1] - w)])
                 correction += repulsion(sep)
             r_new[i] += dt * mu * correction
             # Update orientation
-            e_new[i] = orientation(e[i], dt)
+            e_new[i] = orientation(e[i], dt, w, U, r[i, 1])
         # Return updated position and orientation vectors
         return r_new, e_new
 
@@ -113,25 +119,30 @@ def repulsion(r):
     return 24 * (2 / r_mag**14 - 1 / r_mag**8) * r
 
 @njit
-def orientation(e, dt):
+def orientation(e, dt, w, U, y):
     """
     Calculate and return the new orientation vector in 2D via rotation matrix update.
     
     Arguments:
         e: original orientation vector
         dt: timestep
+        w: width of channel
+        U: maximum flow velocity in channel
+        y: height of particle within channel
         
     Returns:
         the updated orientation vector
     """
-    # Calculate angle from x-axis of the original orientation vector
-    theta = np.arctan2(e[1], e[0])
     # Generate noise term
     noise = np.random.normal(0, 1)
-    # Calculate change in angle of orientation
-    d_theta = np.sqrt(2 * dt) * noise
+    # Calculate change in orientation due to noise
+    d_theta_noise = np.sqrt(2 * dt) * noise
+    # Calculate change in orientation due to angular velocity from flow profile
+    d_theta_flow = dt * 2 * U / w * (2 * y / w - 1)
+    # Calculate angle from x-axis of the original orientation vector
+    theta = np.arctan2(e[1], e[0])
     # Calculate new angle
-    new_theta = theta + d_theta
+    new_theta = theta + d_theta_noise + d_theta_flow
     # Return updated orientation vector
     return np.array([np.cos(new_theta), np.sin(new_theta)])
 
@@ -166,7 +177,7 @@ class ABP:
     An ensemble of active Brownian particles submerged in fluid, for a given system geometry (2D).
     """
 
-    def __init__(self, N, dt, width):
+    def __init__(self, N, dt, width, T):
         """
         Initialise N realisations of the same particle at the origin with random orientations.
         
@@ -174,11 +185,13 @@ class ABP:
             N: number of realisations of the particle
             dt: timestep
             width: width of the channel
+            T: total number of timesteps
         """
         # Initialise variables
         self.N = N
         self.dt = dt
         self.width = width
+        self.T = T
         # Initialise orientation vector of each particle from a uniform rotationally symmetric distribution
         distribution = uniform_direction(2)
         self.e = distribution.rvs(N)
@@ -186,28 +199,25 @@ class ABP:
         self.r = positions(N, width)
         
  
-    def Run(self, v, mu, T, MSD, trajectory):
+    def Run(self, v, mu, U):
         """
-        Run the simulation and display the desired results.
+        Run the simulation and return the results.
         
         Arguments:
             v: ABP velocity
             mu: ABP mobility
-            T: total number of timesteps
-            MSD: display mean square displacement
-            trajectory: display trajectory
+            U: maximum flow velocity
+        
+        Returns:
+            pos: position history of each particle
+            orient: orientation history of each particle
         """
         # Run simulation and retrieve data
-        pos, orient = run(self.N, self.r, self.e, v, mu, self.dt, T, self.width)
-        # Calculate and display mean square displacement
-        if MSD:
-            self.MSD(pos, v, T)
-        # Calculate and display trajectories
-        if trajectory:
-            self.Trajectory(pos)
+        pos, orient = run(self.N, self.r, self.e, v, mu, self.dt, self.T, self.width, U)
+        return pos, orient        
 
 
-    def MSD(self, data, v, T):
+    def MSD(self, data, v):
         """
         Calculate the mean sqaure displacement of an ensemble of particles over time.
         Plot the results on a graph.
@@ -215,7 +225,6 @@ class ABP:
         Arguments:
             data: ABP position history
             v: ABP velocity
-            T: total number of timesteps
         """
         # Calculate mean square displacement along each Cartesian direction
         msds = np.mean((data - data[0])**2, axis=1)
@@ -223,7 +232,7 @@ class ABP:
         msd = np.sum(msds, axis=1)[1:]
 
         # Create array of timesteps
-        t = np.arange(1, T + 1) * self.dt
+        t = np.arange(1, self.T + 1) * self.dt
         # System is 2-dimensional
         d = 2
         # Calculate persistence time
@@ -260,7 +269,9 @@ class ABP:
         
         for i in range(self.N):
             x, y = data[:, i, 0], data[:, i, 1]
-            plt.plot(x, y, color='black')
+            start_x, start_y = data[0, i, 0], data[0, i, 1]
+            plt.scatter(start_x, start_y, color='red', s=20, zorder=1)
+            plt.plot(x, y, color='black', zorder=-1)
 
         plt.xlabel(r"$x$ position [$\sigma$]")
         plt.ylabel(r"$y$ position [$\sigma$]")
@@ -281,7 +292,13 @@ if __name__ == "__main__":
     parser.add_argument('-v', type=float, default=10, help='ABP velocity')
     parser.add_argument('-mu', type=float, default=10, help='ABP mobility')
     parser.add_argument('-w', default=10, type=float, help='Width of channel')
+    parser.add_argument('-u', type=float, default=0, help='Maximum flow velocity')
     args = parser.parse_args()
 
-    abp = ABP(args.N, args.dt, args.w)
-    abp.Run(args.v, args.mu, args.t, args.MSD, args.trajectory)
+    abp = ABP(args.N, args.dt, args.w, args.t)
+    pos, orient = abp.Run(args.v, args.mu, args.u)
+
+    if args.MSD:
+        abp.MSD(pos, args.v)
+    if args.trajectory:
+        abp.Trajectory(pos)
