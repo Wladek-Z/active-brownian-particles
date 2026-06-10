@@ -1,6 +1,23 @@
 import argparse
 from abp import ABP
 
+def FPTD(N, dt, t, v, mu, w, u, x, filename):
+    """
+    Obtain the first-passage time distribution for some point x along the x-axis.
+
+    Arguments:
+        N: number of particles
+        r: particle positions
+        e: particle orientations
+        v: ABP velocity
+        mu: ABP mobility
+        dt: timestep
+        T: total number of timesteps
+        w: width of the channel
+        U: maximum flow velocity
+        filename: file to store results
+    """
+
 if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser()
@@ -12,5 +29,7 @@ if __name__ == "__main__":
     parser.add_argument('-v', type=float, default=10, help='ABP velocity')
     parser.add_argument('-mu', type=float, default=10, help='ABP mobility')
     parser.add_argument('-w', default=10, type=float, help='Width of channel')
-    parser.add_argument('-x', type=float, default=10, help='Distance along x-axis for first-passage time distribution')
+    parser.add_argument('-u', type=float, default=0, help='Maximum flow velocity')
+    parser.add_argument('-x', type=float, default=10, help='Distance along x-axis to check for first-passage')
+    parser.add_argument('-f', type=str, help='Filename for storing the results')
     args = parser.parse_args()
