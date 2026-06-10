@@ -221,20 +221,61 @@ class ABP:
         return pos, orient        
 
 
+    def get_MSD(self, data):
+        """
+        Calculate and return the mean square displacement.
+        
+        Arguments:
+            data: position history
+        
+        Returns:
+            msd_xyz: the MSD along each Cartesian direction
+            msd_tot: the total mean square displacement
+        """
+        # Calculate mean square displacement along each Cartesian direction
+        msd_xyz = np.mean((data - data[0])**2, axis=1)
+        # Calculate total mean square displacement
+        msd_tot = np.sum(msd_xyz, axis=1)
+        # Delete first data point to avoid conflict with logscale
+        return np.delete(msd_xyz, 0), np.delete(msd_tot, 0)
+    
+    def get_MSD_fit(self, msd):
+        """
+        Obtain the power-law dependence of the late-time mean square displacement.
+        
+        Argument:
+            msd: mean square displacement data
+        
+        Returns:
+            a: fitted power
+            b: fitted logarithm of prefactor
+        """
+        # Create array of measurement times
+        t = np.arange(1, self.T + 1) * self.dt
+        # System is 2-dimensional
+        d = 2
+        # Calculate persistence time
+        tau = 1 / (d - 1) 
+        # Consider only late-time data, i.e. >> tau
+        late = t >= 10 * tau
+        y = np.log(msd[late])
+        x = np.log(t[late])
+        # Fit to a 1st degree polynomial
+        a, b = np.polyfit(x, y, 1)
+        # return fitted parameters
+        return a, b
+
     def MSD(self, data):
         """
         Calculate the mean sqaure displacement of an ensemble of particles over time.
         Plot the results on a graph.
 
         Arguments:
-            data: ABP position history
+            data: position history
         """
-        # Calculate mean square displacement along each Cartesian direction
-        msds = np.mean((data - data[0])**2, axis=1)
-        # Calculate total mean square displacement, omitting initial position for logscale
-        msd = np.sum(msds, axis=1)[1:]
+        _, msd = self.get_MSD(data)
 
-        # Create array of timesteps
+        # Create array of measurement times
         t = np.arange(1, self.T + 1) * self.dt
         # System is 2-dimensional
         d = 2
@@ -245,6 +286,10 @@ class ABP:
         # Theoretical msd for ballistic and diffusive regimes
         msd_b = self.Pe**2 * t**2 + 2 * d * self.D**2 * t
         msd_d = 2 * t * (d * self.D**2 + self.Pe**2 * tau)
+        # Perform fit to late-time data
+        a, b = self.get_MSD_fit(msd)
+        t_fit = np.linspace(tau/self.dt, self.T, 100) * self.dt
+        msd_fit = np.exp(b) * t_fit**a
 
         fig = plt.figure(figsize=[8, 6])
         plt.title(f"Mean Square Displacement: Pe = {self.Pe}, " + r"Pe$_{\mathrm{f}}$ = " + f"{self.Pf}")
@@ -252,7 +297,8 @@ class ABP:
         plt.loglog(t, msd_theory, color='red', linestyle='--', label='theory')
         plt.loglog(t, msd_b, color='blue', linestyle='--', label='ballistic')
         plt.loglog(t, msd_d, color='green', linestyle='--', label='diffusive')
-        plt.axvline(tau, color='orange', label=r'$\tau_r$')
+        plt.loglog(t_fit, msd_fit, color='magenta', label=r'$\alpha$ = ' + f'{np.round(a, 2)}')
+        plt.axvline(tau, color='black', linestyle='dotted', label=r'$\tau_r$')
         plt.xlabel(r"time [$1/D_r$]")
         plt.ylabel(r"$\langle r^2 \rangle$ [$\sigma^2$]")
         plt.legend()
@@ -265,7 +311,7 @@ class ABP:
         Plot results on a graph.
         
         Arguments:
-            data: ABP position history
+            data: position history
         """
         fig = plt.figure(figsize=[8, 6])
         plt.title(f"Particle Trajectory: Pe = {self.Pe}, " + r"Pe$_{\mathrm{f}}$ = " + f"{self.Pf}")
