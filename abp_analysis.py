@@ -23,8 +23,9 @@ def power_phase_diagram_data(filename, N, T, dt, w, D, mu):
     # Generate list of Peclet numbers to probe, from user input
     arr = input("Enter range of Peclet numbers to probe (Pe- Pe+ Pf- Pf+): ") 
     l = list(map(float,arr.split(' ')))
-    Pe_list = np.linspace(l[0], l[1], 5)
-    Pf_list = np.linspace(l[2], l[3], 5)
+    number_points = int(input("Enter the size of the Peclet number grid: "))
+    Pe_list = np.round(np.linspace(l[0], l[1], number_points), 2)
+    Pf_list = np.round(np.linspace(l[2], l[3], number_points), 2)
 
     with open(filename, 'w') as f:
         f.write("Pe,Pf,alpha\n")

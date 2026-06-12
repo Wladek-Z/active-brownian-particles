@@ -9,6 +9,13 @@ import random
 plt.style.use('science')
 plt.rcParams['text.usetex'] = False
 
+# Developer tools ;)
+d_crit = 2**(1/6)
+noise = 1
+wall = True
+use_arrows = False
+centre_start = False
+
 @njit
 def run(N, r, e, T, dt, w, Pe, D, mu, Pf):
     """
@@ -73,14 +80,12 @@ def update(N, r, e, dt, w, Pe, D, mu, Pf):
         """
         r_new = np.zeros_like(r)
         e_new = np.zeros_like(e)
-        # Initialise critical distance to obstacles
-        d_crit = 2**(1/6)
         # Iterate over every particle
         for i in range(N):
             # Compute active velocity term
             r_active = dt * Pe * e[i] 
             # Generate positional noise term
-            r_noise = np.sqrt(2 * dt) * D * np.random.normal(0, 1, 2) 
+            r_noise = noise * np.sqrt(2 * dt) * D * np.random.normal(0, 1, 2) 
             # Update position via forward difference scheme
             r_new[i] = r[i] + r_active + r_noise
             # Incorporate correction due to fluid flow
@@ -88,7 +93,7 @@ def update(N, r, e, dt, w, Pe, D, mu, Pf):
             # Initialise correction due to repulsive interactions with obstacles
             correction = np.zeros(2)
             # Check for obstacles
-            if r[i, 0] < d_crit:
+            if (r[i, 0] < d_crit) and wall:
                 # Add repulsive interaction due to left wall
                 sep = np.array([r[i, 0], 0])
                 correction += repulsion(sep)
@@ -136,7 +141,7 @@ def orientation(e, dt, w, Pf, y):
         the updated orientation vector
     """
     # Calculate change in orientation due to noise
-    d_theta_noise = np.sqrt(2 * dt) * np.random.normal(0, 1) 
+    d_theta_noise = noise * np.sqrt(2 * dt) * np.random.normal(0, 1) 
     # Calculate change in orientation due to angular velocity from flow profile
     d_theta_flow = dt * Pf * 2 / w * (2 * y / w - 1) 
     # Calculate angle from x-axis of the original orientation vector
@@ -158,10 +163,10 @@ def positions(N, width):
     Returns:
         r: positions of each particle
     """
-    x_min = 2**(1/6)
+    x_min = d_crit
     x_max = 0.5 * width
-    y_min = 2**(1/6)
-    y_max = width - 2**(1/6)
+    y_min = d_crit
+    y_max = width - d_crit
     # Initialise positions
     r = np.zeros((N, 2))
     # Randomly choose x and y components within specified range
@@ -205,7 +210,10 @@ class ABP:
         distribution = uniform_direction(2)
         self.e = distribution.rvs(N)
         # Initialise positions
-        self.r = positions(N, width)
+        if centre_start:
+            self.r = np.full((N, 2), [2, width/2])
+        else:
+            self.r = positions(N, width)
         
  
     def Run(self):
@@ -305,29 +313,46 @@ class ABP:
         plt.tight_layout()
         plt.show()
 
-    def Trajectory(self, data):
+    def Trajectory(self, data, data1):
         """
-        Retrieve the positions of an ensemble of particles over time.
+        Retrieve the positions of an ensemble of particles over time, as well
+        as their orientations at intervals during the first 10% of timesteps.
         Plot results on a graph.
         
         Arguments:
             data: position history
+            data1: orientation history
         """
         fig = plt.figure(figsize=[8, 6])
         plt.title(f"Particle Trajectory: Pe = {self.Pe}, " + r"Pe$_{\mathrm{f}}$ = " + f"{self.Pf}")
         
-        for i in range(self.N):
-            x, y = data[:, i, 0], data[:, i, 1]
-            start_x, start_y = data[0, i, 0], data[0, i, 1]
-            plt.scatter(start_x, start_y, color='lime', s=20, zorder=1)
-            end_x, end_y = data[-1, i, 0], data[-1, i, 1]
-            plt.scatter(end_x, end_y, color='red', s=20, zorder=1)
-            plt.plot(x, y, color='black', zorder=-1)
+        # Consider only first particle
+        x, y = data[:, 0, 0], data[:, 0, 1]
+        start_x, start_y = data[0, 0, 0], data[0, 0, 1]
+        plt.scatter(start_x, start_y, color='lime', s=20, zorder=1)
+        end_x, end_y = data[-1, 0, 0], data[-1, 0, 1]
+        plt.scatter(end_x, end_y, color='red', s=20, zorder=1)
+        plt.scatter(x, y, color='black', marker='.', s=1, zorder=-1)
 
         plt.xlabel(r"$x$ position [$\sigma$]")
         plt.ylabel(r"$y$ position [$\sigma$]")
-        plt.xlim(0)
-        plt.ylim(0, self.width)
+
+        if wall:
+            plt.xlim(0)
+            plt.ylim(0, self.width)
+
+        if use_arrows:
+            # Create array of arrow directions
+            limit = int(self.T / 10)
+            dx, dy = data1[:limit, 0, 0], data1[:limit, 0, 1]
+            spacing = max(100, limit // 50)
+            dx, dy = dx[::spacing], dy[::spacing]
+            # Create array of arrow bases
+            X, Y = x[:limit], y[:limit]
+            X, Y = X[::spacing], Y[::spacing]
+            # Make quiver plot
+            plt.quiver(X, Y, dx, dy, color='red', width=0.002, headwidth=3, headlength=4, scale=25)
+
         plt.tight_layout()
         plt.show()
     
@@ -351,7 +376,7 @@ class ABP:
         first = np.argmax(crossed, axis=0)
         # Discard all unsuccessful attempts and convert to time units
         fpt = first[has_crossed] * self.dt
-        success_rate = len(fpt) / self.N * 100
+        success_rate = np.round(len(fpt) / self.N * 100, 1)
 
         # Build histogram of the FPTD
         fig = plt.figure(figsize=[8, 6])
@@ -374,9 +399,9 @@ if __name__ == "__main__":
     parser.add_argument('-Pe', type=float, default=5, help='Active Peclet number')
     parser.add_argument('-mu', type=float, default=10, help='Dimensionless force constant')
     parser.add_argument('-w',  type=float, default=10, help='Width of channel')
-    parser.add_argument('-Pf', type=float, default=0, help='Flow Peclet number')
+    parser.add_argument('-Pf', type=float, default=5, help='Flow Peclet number')
     parser.add_argument('-D', type=float, default=1, help='Dimensionless ratio of diffusion constants')
-    parser.add_argument('-x', type=float, default=20, help='Distance along x-axis to check for first-passage')
+    parser.add_argument('-x', type=float, default=50, help='Distance along x-axis to check for first-passage')
     args = parser.parse_args()
 
     abp = ABP(args.N, args.T, args.dt, args.w, args.Pe, args.D, args.mu, args.Pf)
@@ -385,6 +410,6 @@ if __name__ == "__main__":
     if args.MSD:
         abp.MSD(pos)
     if args.trajectory:
-        abp.Trajectory(pos)
+        abp.Trajectory(pos, orient)
     if args.FPTD:
         abp.FPTD(pos, args.x)
