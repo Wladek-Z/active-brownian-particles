@@ -13,6 +13,7 @@ plt.rcParams['text.usetex'] = False
 d_crit = 2**(1/6)
 d = 2
 noise = 1
+wall = True
 use_arrows = False
 centre_start = False
 
@@ -93,6 +94,10 @@ def update(N, r, e, dt, w, Pe, D, mu, Pf):
             # Initialise correction due to repulsive interactions with obstacles
             correction = np.zeros(2)
             # Check for obstacles
+            if (r[i, 0] < d_crit) and wall:
+                # Add repulsive interaction due to left wall
+                sep = np.array([r[i, 0], 0])
+                correction += repulsion(sep)
             if r[i, 1] < d_crit:
                 # Add repulsive interaction due to lower wall
                 sep = np.array([0, r[i, 1]])
@@ -159,8 +164,8 @@ def positions(N, width):
     Returns:
         r: positions of each particle
     """
-    x_min = d_crit - width / 2
-    x_max = width / 2 - d_crit
+    x_min = d_crit
+    x_max = 0.5 * width
     y_min = d_crit
     y_max = width - d_crit
     # Initialise positions
@@ -207,7 +212,7 @@ class ABP:
         self.e = distribution.rvs(N)
         # Initialise positions
         if centre_start:
-            self.r = np.full((N, 2), [0, width/2])
+            self.r = np.full((N, 2), [2, width/2])
         else:
             self.r = positions(N, width)
         
@@ -269,19 +274,18 @@ class ABP:
     
     def get_xspeed(self, data):
         """
-        Obtain the instantaneous velocity of each particle in the x direction over time.
+        Obtain the mean velocity in the x-direction over the entire trajectory of each particle.
         
         Arguments:
             data: position history
         
         Returns:
-            instantaneous velocity of each particle in the x direction (T, N)
+            mean velocity in the x-direction
         """
         # Get x-position history
         x = data[:, :, 0]
-        # Calculate instantaneous velocity
-        dx = x[1:] - x[:-1]
-        return dx / self.dt
+        # Return mean velocity in the x-direction
+        return np.mean(x[-1] - x[0]) / (self.T * self.dt)
 
     def MSD(self, data):
         """
@@ -345,7 +349,9 @@ class ABP:
         plt.xlabel(r"$x$ position [$\sigma$]")
         plt.ylabel(r"$y$ position [$\sigma$]")
 
-        plt.ylim(0, self.width)
+        if wall:
+            plt.xlim(0)
+            plt.ylim(0, self.width)
 
         if use_arrows:
             # Create array of arrow directions
@@ -396,7 +402,7 @@ class ABP:
 if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('-N', type=int, default=100, help='Number of realisations of the ABP')
+    parser.add_argument('-N', type=int, default=1, help='Number of realisations of the ABP')
     parser.add_argument('-dt', type=float, default=0.001, help='Simulation timestep')
     parser.add_argument('--MSD', action='store_true', help='Find the mean square displacement')
     parser.add_argument('--trajectory', action='store_true', help='Find the particle trajectory')
