@@ -13,6 +13,7 @@ plt.rcParams['text.usetex'] = False
 d_crit = 2**(1/6)
 d = 2
 noise = 1
+G = 1
 use_arrows = False
 centre_start = False
 
@@ -142,8 +143,10 @@ def orientation(e, dt, w, Pf, y):
     d_theta_flow = dt * Pf * 2 / w * (2 * y / w - 1) 
     # Calculate angle from x-axis of the original orientation vector
     theta = np.arctan2(e[1], e[0])
+    # Calculate contribution due to shear
+    d_theta_shear = 2 * G * Pf * dt / w * (1 - 2 * y / w) * np.cos(2 * theta)
     # Calculate new angle
-    new_theta = theta + d_theta_noise + d_theta_flow
+    new_theta = theta + d_theta_noise + d_theta_flow + d_theta_shear
     # Return updated orientation vector
     return np.array([np.cos(new_theta), np.sin(new_theta)])
 

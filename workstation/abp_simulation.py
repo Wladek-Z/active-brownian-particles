@@ -66,4 +66,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.PD:
-        phase_diagram_data(args.f, args.N, args.T, args.dt, args.w, args.D, args.mu, args.l, args.u, args.n)
+        phase_diagram_data(args.f, args.N, args.T, args.dt, args.w, args.D, args.mu, args.l1, args.u1, args.l2, args.u2, args.n)

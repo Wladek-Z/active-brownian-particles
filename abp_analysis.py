@@ -16,7 +16,7 @@ def phase_diagram_plot(filename):
     """
     # Read in and interpret data
     lp_w, Pf_Pe, a, back_frac, mean_vx = np.loadtxt(filename, delimiter=',', skiprows=1, unpack=True)
-    nlp_w, nPf_Pe = np.unique(Pe_w), np.unique(Pf_Pe)
+    nlp_w, nPf_Pe = np.unique(lp_w), np.unique(Pf_Pe)
     size_x = len(nlp_w)
     size_y = len(nPf_Pe)
     A = a.reshape(size_x, size_y).T
