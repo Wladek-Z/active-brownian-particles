@@ -12,12 +12,12 @@ plt.rcParams['text.usetex'] = False
 # Developer tools ;)
 d_crit = 2**(1/6)
 d = 2
-noise = 0
-use_arrows = True
-centre_start = True
+noise = 1
+use_arrows = False
+centre_start = False
 
 @njit
-def run(N, r, e, T, dt, w, Ps, D, mu, Pf):
+def run(N, r, e, T, dt, w, Ps, D, mu, Pf, G):
     """
     Run the simulation for T timesteps, recording all positions and orientations.
 
@@ -32,6 +32,7 @@ def run(N, r, e, T, dt, w, Ps, D, mu, Pf):
         D: diffusion number
         mu: repulsion number
         Pf: flow Peclet number
+        G: elongation factor
 
     Returns:
         pos_H: history of positions
@@ -50,7 +51,7 @@ def run(N, r, e, T, dt, w, Ps, D, mu, Pf):
         # Update position and orientation
         r_old = r.copy()
         e_old = e.copy()
-        r, e = update(N, r_old, e_old, dt, w, Ps, D, mu, Pf)
+        r, e = update(N, r_old, e_old, dt, w, Ps, D, mu, Pf, G)
         # Store position and orientation of each particle
         for j in range(N):
             for k in range(2):
@@ -59,7 +60,7 @@ def run(N, r, e, T, dt, w, Ps, D, mu, Pf):
     return pos_H, pos_O   
 
 @njit
-def update(N, r, e, dt, w, Ps, D, mu, Pf):
+def update(N, r, e, dt, w, Ps, D, mu, Pf, G):
         """
         Update the positions and orientations of each particle.
         
@@ -73,6 +74,7 @@ def update(N, r, e, dt, w, Ps, D, mu, Pf):
             D: diffusion number
             mu: repulsion number
             Pf: flow Peclet number
+            G: elongation factor
 
         Returns:
             r_new: updated positions
@@ -103,7 +105,7 @@ def update(N, r, e, dt, w, Ps, D, mu, Pf):
                 correction += repulsion(sep)
             r_new[i] += dt * mu * correction
             # Update orientation
-            e_new[i] = orientation(e[i], dt, w, Pf, r[i, 1])
+            e_new[i] = orientation(e[i], dt, w, Pf, r[i, 1], G)
         # Return updated position and orientation vectors
         return r_new, e_new
 
@@ -122,7 +124,7 @@ def repulsion(sep):
     return 24 * (2 / r**14 - 1 / r**8) * sep
 
 @njit
-def orientation(e, dt, w, Pf, y):
+def orientation(e, dt, w, Pf, y, G):
     """
     Calculate and return the new orientation vector in 2D via rotation matrix update.
     
@@ -132,6 +134,7 @@ def orientation(e, dt, w, Pf, y):
         w: width of channel
         Pf: flow Peclet number
         y: height of particle within channel
+        G: elongation factor
         
     Returns:
         the updated orientation vector
@@ -143,7 +146,7 @@ def orientation(e, dt, w, Pf, y):
     # Calculate angle from x-axis of the original orientation vector
     theta = np.arctan2(e[1], e[0])
     # Calculate contribution due to shear
-    d_theta_shear = 2 * G * Pf * dt / w * (1 - 2 * y / w) * np.cos(2 * theta)
+    d_theta_shear = G * dt * Pf * 2 / w * (1 - 2 * y / w) * np.cos(2 * theta)
     # Calculate new angle
     new_theta = theta + d_theta_noise + d_theta_flow + d_theta_shear
     # Return updated orientation vector
@@ -180,7 +183,7 @@ class ABP:
     An ensemble of active Brownian particles submerged in fluid, for a given system geometry (2D).
     """
 
-    def __init__(self, N, T, dt, width, Ps, D, mu, Pf, shear):
+    def __init__(self, N, T, dt, width, Ps, D, mu, Pf, G):
         """
         Initialise N realisations of the same particle at the origin with random orientations.
         
@@ -193,7 +196,7 @@ class ABP:
             D: diffusion number
             mu: repulsion number
             Pf: flow Peclet number
-            shear: shear turned on/off            
+            G: geometrical elongation factor        
         """
         # Initialise variables
         self.N = N
@@ -204,14 +207,14 @@ class ABP:
         self.D = D
         self.mu = mu
         self.Pf = Pf
-        global G
-        G = 1 if shear else 0
+        self.G = G
         # Initialise orientation vector of each particle from a uniform rotationally symmetric distribution
         distribution = uniform_direction(2)
         self.e = distribution.rvs(N)
         # Initialise positions
         if centre_start:
             self.r = np.full((N, 2), [0, width/2])
+            self.e = np.full((N, 2), [1/np.sqrt(2), 1/np.sqrt(2)])
         else:
             self.r = positions(N, width)
         
@@ -225,7 +228,7 @@ class ABP:
             orient: orientation history of each particle
         """
         # Run simulation and retrieve data
-        pos, orient = run(self.N, self.r, self.e, self.T, self.dt, self.width, self.Ps, self.D, self.mu, self.Pf)
+        pos, orient = run(self.N, self.r, self.e, self.T, self.dt, self.width, self.Ps, self.D, self.mu, self.Pf, self.G)
         return pos, orient        
 
 
@@ -347,8 +350,7 @@ class ABP:
         plt.scatter(x, y, color='black', marker='.', s=1, zorder=-1)
         plt.xlabel(r"$x$ position [$\sigma$]")
         plt.ylabel(r"$y$ position [$\sigma$]")
-        if noise == 1:
-            plt.ylim(0, self.width)
+        plt.ylim(0, self.width)
         # Plot early-time orientations along trajectory
         if use_arrows:
             # Create array of arrow directions
@@ -413,13 +415,58 @@ class ABP:
         plt.tight_layout()
         plt.show()
 
+    def PDF(self, p, o):
+        """
+        Obtain the probability density functions in both positional and
+        orientational space.
+
+        Arguments:
+            p: position data
+            o: orientation data
+        """
+        # Isolate vertical position from position data
+        y = p[:, :, 1].flatten() / self.width
+
+        # Construct positional PDF
+        pdf1, edges1 = np.histogram(y, bins=100, density=True)
+        x1 = 0.5 * (edges1[:-1] + edges1[1:])
+
+        fig = plt.figure(figsize=[8, 6])
+        plt.plot(x1, pdf1, color='black')
+        plt.title(f"Spatial distribution of ABPs: " + r"Pe$_{\mathrm{s}}$ = " + f"{self.Ps}, " + r"Pe$_{\mathrm{f}}$ = " + f"{self.Pf}")
+        plt.xlabel("height along channel, $y/w$")
+        plt.ylabel("probability density, $P(y/w)$")
+        plt.xlim(0, 1)
+        plt.tight_layout()
+
+        # Isolate orientation angles from orientation data
+        theta = np.arctan2(o[:, :, 1].flatten(), o[:, :, 0].flatten())
+
+        # Construct orientational PDF
+        pdf2, edges2 = np.histogram(theta, bins=100, density=True)
+        x2 = 0.5 * (edges2[:-1] + edges2[1:])
+
+        fig = plt.figure(figsize=[8, 6])
+        plt.plot(x2, pdf2, color='black')
+        plt.title("Orientational distribution of ABPs: " + r"Pe$_{\mathrm{s}}$ = " + f"{self.Ps}, " + r"Pe$_{\mathrm{f}}$ = " + f"{self.Pf}")
+        plt.xlabel(r"orientation angle, $\theta$")
+        plt.ylabel(r"probability density, $P(\theta)$")
+        plt.xlim(-np.pi, np.pi)
+        plt.xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
+        plt.tight_layout()
+
+        plt.show()
+
+
+
 if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('-N', type=int, default=100, help='Number of realisations of the ABP')
     parser.add_argument('-dt', type=float, default=0.001, help='Simulation timestep')
-    parser.add_argument('--MSD', action='store_true', help='Find the mean square displacement')
-    parser.add_argument('--trajectory', action='store_true', help='Find the particle trajectory')
+    parser.add_argument('--MSD', action='store_true', help='Obtain the mean square displacement')
+    parser.add_argument('--trajectory', action='store_true', help='Display the particle trajectory')
+    parser.add_argument('--PDF', action='store_true', help='Obtain the probability density functions')
     parser.add_argument('--FPTD', action='store_true', help='Obtain first-passage time distribution')
     parser.add_argument('-T', type=int, default=100000, help='Number of timesteps over which to run the simulation')
     parser.add_argument('-Ps', type=float, default=5, help='Swim Peclet number')
@@ -428,11 +475,11 @@ if __name__ == "__main__":
     parser.add_argument('-Pf', type=float, default=5, help='Flow Peclet number')
     parser.add_argument('-D', type=float, default=1, help='Dimensionless ratio of diffusion constants')
     parser.add_argument('-x', type=float, default=50, help='Distance along x-axis to check for first-passage')
-    parser.add_argument('--shear', action='store_true', help='Turn on the effects of shear')
+    parser.add_argument('-G', type=float, default=0, help='Geometrical factor related to particle aspect ratio')
     parser.add_argument('--init', action='store_true', help='View the initial configuration of the system')
     args = parser.parse_args()
 
-    abp = ABP(args.N, args.T, args.dt, args.w, args.Ps, args.D, args.mu, args.Pf, args.shear)
+    abp = ABP(args.N, args.T, args.dt, args.w, args.Ps, args.D, args.mu, args.Pf, args.G)
 
     if args.init:
         abp.initial_config()
@@ -445,3 +492,5 @@ if __name__ == "__main__":
         abp.MSD(pos)
     if args.FPTD:
         abp.FPTD(pos, args.x)
+    if args.PDF:
+        abp.PDF(pos, orient)
