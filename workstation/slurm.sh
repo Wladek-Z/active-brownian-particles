@@ -9,4 +9,4 @@
 #######################################
 
 source .venv/bin/activate
-python abp_simulation.py -f noshear.txt --PD -l1 0.25 -u1 4 -l2 0.125 -u2 2 -n 16
+python abp_simulation.py -f pdx.txt --PDX -l1 0.25 -u1 4 -l2 0.125 -u2 2 -n 16 -G 1
