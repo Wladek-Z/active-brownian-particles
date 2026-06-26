@@ -1,8 +1,8 @@
 #!/bin/bash
 
-#SBATCH --partition medium
+#SBATCH --partition long
 #SBATCH --mem-per-cpu 8G
-#SBATCH --time 4:00:00
+#SBATCH --time 12:00:00
 #SBATCH --job-name ABP
 #SBATCH --error error-%j.txt
 #

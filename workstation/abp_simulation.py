@@ -31,7 +31,7 @@ def phase_diagram(filename, N, T, dt, w, D, mu, l1, u1, l2, u2, n, G):
     Pf_Ps_list = np.round(np.linspace(l2, u2, n), 3)
 
     with open(filename, 'w') as f:
-        f.write("lp_w,Pf_Ps,alpha,up_frac,mean_vx\n")
+        f.write("lp_w,Pf_Ps,alpha,trap_frac,mean_vx\n")
 
         for lp_w in lp_w_list:
             Ps = lp_w * w
@@ -42,11 +42,12 @@ def phase_diagram(filename, N, T, dt, w, D, mu, l1, u1, l2, u2, n, G):
                 _, msd = abp.get_MSD(r)
                 a, _ = abp.get_MSD_fit(msd)
                 vx = abp.get_xspeed(r)
-                up_frac = np.count_nonzero(vx < 0) / N / T
+                trap = abp.trapping_index(r, vx)
+                trap_frac = np.count_nonzero(trap) / (N * T)
                 mean_vx = np.mean(vx)
                 # Track progress
-                print(f"Ps = {Ps}, Pf = {Pf}, alpha = {a}, fraction = {up_frac}, mean x-velocity = {mean_vx}")
-                f.write(f"{lp_w},{Pf_Ps},{a},{up_frac},{mean_vx}\n")
+                print(f"Ps = {Ps}, Pf = {Pf}, alpha = {a}, trapping fraction = {trap_frac}, mean x-velocity = {mean_vx}")
+                f.write(f"{lp_w},{Pf_Ps},{a},{trap_frac},{mean_vx}\n")
 
 def phase_diagram_x(filename, N, T, dt, w, D, mu, l1, u1, l2, u2, n, G):
     """

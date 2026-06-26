@@ -233,6 +233,43 @@ class ABP:
         plt.tight_layout()
         plt.show()
 
+    def blk_sfc_swim(self, data, theta):
+        """
+        Split the swimming direction data based on the proximity of particles to the channel walls.
+        
+        Arguments:
+            data: position history
+            theta: flattened swimming direction data 
+        
+        Returns:
+            theta_blk: swimming direction data in bulk
+            theta_sfc: swimming direction data near surface
+        """
+        y = data[:-1, :, 1].flatten()
+        bulk = (y >= 1.5) & (y <= (self.width - 1.5))
+        theta_blk = theta[bulk]
+        theta_sfc = theta[~bulk]
+        return theta_blk, theta_sfc
+    
+    def blk_sfc_orient(self, data, theta):
+        """
+        Split the orientation data based on the proximity of particles to the channel walls.
+        
+        Arguments:
+            data: position history
+            theta: flattened orientation angle data 
+        
+        Returns:
+            theta_blk: orientation angle data in bulk
+            theta_sfc: orientation angle data near surface
+        """
+        y = data[:, :, 1].flatten()
+        bulk = (y >= 1.5) & (y <= (self.width - 1.5))
+        theta_blk = theta[bulk]
+        theta_sfc = theta[~bulk]
+        return theta_blk, theta_sfc
+
+
     def PDF(self, p, o):
         """
         Obtain the probability density functions in both positional and
