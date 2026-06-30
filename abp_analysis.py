@@ -1,6 +1,7 @@
 import argparse
 import numpy as np
 from matplotlib import pyplot as plt
+import matplotlib.colors as colors
 from abp import ABP
 
 plt.style.use('science')
@@ -24,19 +25,41 @@ def phase_diagram(filename):
     VX = mean_vx.reshape(size_x, size_y).T
     X, Y = np.meshgrid(nlp_w, nPf_Ps)
 
-    def plot_pd(label, data):
-        fig = plt.figure(figsize=[8, 6])
-        plt.title("ABP Channel Phase Diagram")
-        plt.pcolormesh(X, Y, data, cmap='viridis', shading='auto')
-        plt.colorbar(label=label)
-        plt.xlabel("$l_p/w$")
-        plt.ylabel(r"Pe$_{\mathrm{f}}$/Pe$_{\mathrm{s}}$")
-        plt.tight_layout()
-        return fig
-    
-    plot_pd(r'MSD scaling exoponent, $\alpha$', A)
-    plot_pd('trapping fraction', TF)
-    plot_pd(r'mean longitudinal velocity [$\sigma D_r$]', VX)
+    # Define custom colormap
+    colours = ['blue', 'white', 'red']
+    cmap = colors.ListedColormap(colours)
+    boundaries = np.array([1, 1.2, 1.8, 2])
+
+    # Plot MSD scaling exponent
+    fig = plt.figure(figsize=[8, 6])
+    plt.title("ABP channel phase diagram")
+    plt.pcolormesh(X, Y, A, cmap=cmap, shading='auto')
+    cbar = plt.colorbar(label=r'MSD scaling exoponent, $\alpha$', boundaries=boundaries, spacing='proportional')
+    cbar.set_ticks([1.2, 1.8])
+    cbar.set_ticklabels([1.2, 1.8])
+    plt.xlabel("$l_p/w$")
+    plt.ylabel(r"Pe$_{\mathrm{f}}$/Pe$_{\mathrm{s}}$")
+
+    # Normalise divergent colormap
+    norm_vx = colors.TwoSlopeNorm(vmin=VX.min(), vcenter=0, vmax=VX.max())
+
+    # Plot mean longitudinal velocity
+    fig = plt.figure(figsize=[8, 6])
+    plt.title("ABP channel phase diagram")
+    plt.pcolormesh(X, Y, VX, cmap='bwr', shading='auto', norm=norm_vx)
+    plt.colorbar(label=r'mean longitudinal velocity [$\sigma D_r$]')
+    plt.xlabel("$l_p/w$")
+    plt.ylabel(r"Pe$_{\mathrm{f}}$/Pe$_{\mathrm{s}}$")
+
+    # Plot trapping fraction    
+    fig = plt.figure(figsize=[8, 6])
+    plt.title("ABP channel phase diagram")
+    plt.pcolormesh(X, Y, TF, cmap='viridis', shading='auto')
+    plt.colorbar(label='trapping fraction')
+    plt.xlabel("$l_p/w$")
+    plt.ylabel(r"Pe$_{\mathrm{f}}$/Pe$_{\mathrm{s}}$")
+
+    plt.tight_layout()
     plt.show()
 
 def pd_comparison(filename1, filename2):
@@ -68,10 +91,11 @@ def pd_comparison(filename1, filename2):
     X2, Y2 = np.meshgrid(nlp_w2, nPf_Ps2)
 
     # Define function for plotting phase diagram comparison
-    def plot_comparison_figure(label, data1, data2, cmap='viridis'):
+    def plot_comparison_figure(label, data1, data2, cmap):
         vmin = min(np.nanmin(data1), np.nanmin(data2))
         vmax = max(np.nanmax(data1), np.nanmax(data2))
-        fig, axes = plt.subplots(1, 2, figsize=[14, 6], constrained_layout=True)
+        
+        fig, axes = plt.subplots(1, 2, figsize=[14, 6], constrained_layout=True, sharey=True)
 
         mesh1 = axes[0].pcolormesh(X1, Y1, data1, cmap=cmap, shading='auto', vmin=vmin, vmax=vmax)
         axes[0].set_title('Shear effects')
@@ -86,10 +110,57 @@ def pd_comparison(filename1, filename2):
         fig.suptitle("ABP Channel Phase Diagram Comparison")
         fig.colorbar(mesh2, ax=axes, location='right', label=label)
         return fig
+    
+    # Define custom colormap
+    colours = ['blue', 'white', 'red']
+    cmap = colors.ListedColormap(colours)
+    boundaries = np.array([1, 1.2, 1.8, 2])
 
-    plot_comparison_figure(r"MSD scaling exponent, $\alpha$", A1, A2)
-    plot_comparison_figure("trapping fraction", TF1, TF2)
-    plot_comparison_figure(r"mean longitudinal velocity [$\sigma D_r$]", VX1, VX2)
+    # Plot comparison of MSD scaling exponents
+    fig, axes = plt.subplots(1, 2, figsize=[14, 6], constrained_layout=True, sharey=True)
+    mesh1 = axes[0].pcolormesh(X1, Y1, A1, cmap=cmap, shading='auto')
+    axes[0].set_title('shear effects')
+    axes[0].set_xlabel("$l_p/w$")
+    axes[0].set_ylabel(r"Pe$_{\mathrm{f}}$/Pe$_{\mathrm{s}}$")
+    mesh2 = axes[1].pcolormesh(X2, Y2, A2, cmap=cmap, shading='auto')
+    axes[1].set_title('no shear effects')
+    axes[1].set_xlabel("$l_p/w$")
+    fig.suptitle("ABP channel phase diagram comparison")
+    cbar = fig.colorbar(mesh2, ax=axes, location='right', label=r"MSD scaling exponent, $\alpha$", boundaries=boundaries, spacing='proportional')
+    cbar.set_ticks([1.2, 1.8])
+    cbar.set_ticklabels([1.2, 1.8])
+
+    # Normalise divergent colormap
+    vmin = min(np.nanmin(VX1), np.nanmin(VX2))
+    vmax = max(np.nanmax(VX1), np.nanmax(VX2))
+    norm_vx = colors.TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)
+
+    # Plot comparison of mean longitudinal velocity    
+    fig, axes = plt.subplots(1, 2, figsize=[14, 6], constrained_layout=True, sharey=True)
+    mesh1 = axes[0].pcolormesh(X1, Y1, VX1, cmap='bwr', shading='auto', norm=norm_vx)
+    axes[0].set_title('shear effects')
+    axes[0].set_xlabel("$l_p/w$")
+    axes[0].set_ylabel(r"Pe$_{\mathrm{f}}$/Pe$_{\mathrm{s}}$")
+    mesh2 = axes[1].pcolormesh(X2, Y2, VX2, cmap='bwr', shading='auto', norm=norm_vx)
+    axes[1].set_title('no shear effects')
+    axes[1].set_xlabel("$l_p/w$")
+    fig.suptitle("ABP channel phase diagram comparison")
+    fig.colorbar(mesh2, ax=axes, location='right', label=r"mean longitudinal velocity [$\sigma D_r$]")
+
+    # Plot trapping fraction comparison
+    vmin = min(np.nanmin(TF1), np.nanmin(TF2))
+    vmax = max(np.nanmax(TF1), np.nanmax(TF2))
+    fig, axes = plt.subplots(1, 2, figsize=[14, 6], constrained_layout=True, sharey=True)
+    mesh1 = axes[0].pcolormesh(X1, Y1, TF1, cmap='viridis', shading='auto', vmin=vmin, vmax=vmax)
+    axes[0].set_title('shear effects')
+    axes[0].set_xlabel("$l_p/w$")
+    axes[0].set_ylabel(r"Pe$_{\mathrm{f}}$/Pe$_{\mathrm{s}}$")
+    mesh2 = axes[1].pcolormesh(X2, Y2, TF2, cmap='viridis', shading='auto', vmin=vmin, vmax=vmax)
+    axes[1].set_title('no shear effects')
+    axes[1].set_xlabel("$l_p/w$")
+    fig.suptitle("ABP channel phase diagram comparison")
+    fig.colorbar(mesh2, ax=axes, location='right', label='trapping fraction')
+
     plt.show()
 
 def pdx_comparison(filename1):
