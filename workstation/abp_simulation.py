@@ -6,6 +6,9 @@ import sys
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from abp import ABP
+import os
+
+jobid = os.environ.get("SLURM_JOB_ID", "local")
 
 def phase_diagram(filename, N, T, dt, w, D, mu, l1, u1, l2, u2, n, G):
     """
@@ -40,7 +43,7 @@ def phase_diagram(filename, N, T, dt, w, D, mu, l1, u1, l2, u2, n, G):
                 abp = ABP(N, T, dt, w, Ps, D, mu, Pf, G)
                 pos, _ = abp.Run()
                 # Decorrelate the position data
-                p = pos[::abp.step][:-1]
+                p = pos[::abp.step][10:-1]
                 # Get results
                 _, msd = abp.get_MSD(pos)
                 a, _ = abp.get_MSD_fit(msd)
@@ -55,7 +58,7 @@ def phase_diagram(filename, N, T, dt, w, D, mu, l1, u1, l2, u2, n, G):
 
 def phase_diagram_x(filename, N, T, dt, w, D, mu, l1, u1, l2, u2, n, G):
     """
-    Collect data for various phase diagrams of the ABP system by varying the ration of both
+    Collect data for various phase diagrams of the ABP system by varying the ratio of both
     Peclet numbers and the ratio of the persistence length and the channel width.
 
     Arguments:
@@ -93,6 +96,49 @@ def phase_diagram_x(filename, N, T, dt, w, D, mu, l1, u1, l2, u2, n, G):
                 print(f"Ps = {Ps}, Pf = {Pf}, alpha = {a}, alphaX = {a_x}")
                 f.write(f"{lp_w},{Pf_Ps},{a},{a_x}\n")
 
+def collect_histogram(folder, N, T, dt, Ps, w, D, mu, Pf, G, bins):
+    """
+    Collect data for histograms of the ABP system for large N.
+    Automatically write to npz file.
+
+    Arguments:
+        folder: folder in which to save the data
+        N: number of particles
+        T: number of timesteps
+        dt: timestep
+        Ps: swim Peclet number
+        w: width of channel
+        D: dimensionless diffusion constant
+        mu: dimensionless repulsion strength
+        Pf: flow Peclet number
+        G: elongation factor
+        bins: number of bins for histogram
+    """
+    # Run the simulation
+    abp = ABP(N, T, dt, w, Ps, D, mu, Pf, G)
+    pos, orient = abp.Run()
+    # Decorrelate the data
+    p = pos[::abp.step][10:-1]
+    o = orient[::abp.step][10:-1]
+    # Isolate vertical position from position data
+    y = p[:, :, 1].flatten() / w
+    # Construct positional PDF
+    pdf1, edges1 = np.histogram(y, bins=bins)
+    # Isolate orientation angles from orientation data
+    theta = np.arctan2(o[:, :, 1], o[:, :, 0]).flatten()
+    # Construct orientational PDF
+    pdf2, edges2 = np.histogram(theta, bins=bins)
+    # Find particle orientations for upstream swimmers near the surface
+    vx = abp.get_xspeed(pos)
+    vx_independent = vx[::abp.step][10:]
+    trap = abp.trapping_index(p, vx_independent)
+    theta_sfc = theta[trap.flatten()]
+    # Construct orientational PDF near the surface
+    pdf3, edges3 = np.histogram(theta_sfc, bins=bins)
+    # Save data to npz file
+    np.savez(f'{folder}/data_{jobid}.npz', pdf1=pdf1, edges1=edges1, pdf2=pdf2, edges2=edges2, pdf3=pdf3, edges3=edges3)
+
+
 if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser()
@@ -102,7 +148,8 @@ if __name__ == "__main__":
     parser.add_argument('-mu', type=float, default=10, help='Dimensionless force constant')
     parser.add_argument('-w',  type=float, default=10, help='Width of channel')
     parser.add_argument('-D', type=float, default=1, help='Dimensionless ratio of diffusion constants')
-    parser.add_argument('-f', type=str, default=None, help='Filepath to data for reading/writing')
+    parser.add_argument('-f', type=str, default=None, help='Filepath to save data')
+    parser.add_argument('-F', type=str, default=None, help='Folder in which to store saved data')
     parser.add_argument('--PD', action='store_true', help='Construct the phase diagram')
     parser.add_argument('--PDX', action='store_true', help='Record MSD scaling exponents, including x-direction')
     parser.add_argument('-l1', type=float, help='Lower bound for data collection (first axis)')
@@ -115,9 +162,13 @@ if __name__ == "__main__":
     parser.add_argument('-Pf', type=float, default=5, help='Flow Peclet number')
     parser.add_argument('--MSD', action='store_true', help='Find the mean square displacement')
     parser.add_argument('--trajectory', action='store_true', help='Find the particle trajectory')
+    parser.add_argument('-bins', type=int, default=50, help='Number of bins to use in histogram')
+    parser.add_argument('--hist', action='store_true', help='Collect data to construct histograms')
     args = parser.parse_args()
 
     if args.PD:
         phase_diagram(args.f, args.N, args.T, args.dt, args.w, args.D, args.mu, args.l1, args.u1, args.l2, args.u2, args.n, args.G)
     elif args.PDX:
         phase_diagram_x(args.f, args.N, args.T, args.dt, args.w, args.D, args.mu, args.l1, args.u1, args.l2, args.u2, args.n, args.G)
+    elif args.hist:
+        collect_histogram(args.F, args.N, args.T, args.dt, args.Ps, args.w, args.D, args.mu, args.Pf, args.G, args.bins)

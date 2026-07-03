@@ -12,7 +12,8 @@ plt.rcParams['text.usetex'] = False
 # Developer tools ;)
 d_crit = 2**(1/6)
 d = 2
-noise = 1
+noise_t = 1
+noise_r = 1
 use_arrows = False
 centre_start = False
 
@@ -87,7 +88,7 @@ def update(N, r, e, dt, w, Ps, D, mu, Pf, G):
             # Compute active velocity term
             r_active = dt * Ps * e[i] 
             # Generate translational noise term
-            r_noise = noise * np.sqrt(2 * dt) * D * np.random.normal(0, 1, 2) 
+            r_noise = noise_t * np.sqrt(2 * dt) * D * np.random.normal(0, 1, 2) 
             # Update position via forward difference scheme
             r_new[i] = r[i] + r_active + r_noise
             # Incorporate correction due to fluid flow
@@ -140,7 +141,7 @@ def orientation(e, dt, w, Pf, y, G):
         the updated orientation vector
     """
     # Calculate change in orientation due to rotational noise
-    d_theta_noise = noise * np.sqrt(2 * dt) * np.random.normal(0, 1) 
+    d_theta_noise = noise_r * np.sqrt(2 * dt) * np.random.normal(0, 1) 
     # Calculate change in orientation due to angular velocity from flow profile
     d_theta_flow = dt * Pf * 2 / w * (2 * y / w - 1) 
     # Calculate angle from x-axis of the original orientation vector
@@ -493,8 +494,8 @@ class ABP:
             orient: orientation data
         """
         # Decorrelate position and orientation data
-        p = pos[::self.step][:-1]
-        o = orient[::self.step][:-1]
+        p = pos[::self.step][10:-1]
+        o = orient[::self.step][10:-1]
         
         # Isolate vertical position from position data
         y = p[:, :, 1].flatten() / self.width
@@ -525,7 +526,7 @@ class ABP:
 
         # Find particle orientations near the surface
         vx = self.get_xspeed(pos)
-        vx_independent = vx[::self.step]
+        vx_independent = vx[::self.step][10:]
         trap = self.trapping_index(p, vx_independent)
         theta_sfc = theta[trap.flatten()]
 
