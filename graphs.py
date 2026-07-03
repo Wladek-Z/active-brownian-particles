@@ -27,7 +27,7 @@ def angular_velocity():
         plt.plot(x, O_s, color='red', linestyle='--', label="shear")
         plt.plot(x, O, color='black', linestyle='dotted', label="total")
         plt.xlabel("$y/w$")
-        plt.ylabel(r"$\Omega$ [$\mathrm{Pe}_{\mathrm{f}}/w$]")
+        plt.ylabel(r"$\Omega$ [$Pe_f/w$]")
         plt.text(0.5, 0.95, r"$\theta$ = " + label, fontsize=16, ha='center', va='top', transform=plt.gca().transAxes)
         plt.legend(loc='lower center')
         plt.tight_layout()

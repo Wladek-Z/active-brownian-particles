@@ -2,7 +2,10 @@ import argparse
 import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib.colors as colors
+from pathlib import Path
+import scienceplots
 from abp import ABP
+from pathlib import Path
 
 plt.style.use('science')
 plt.rcParams['text.usetex'] = False
@@ -38,7 +41,7 @@ def phase_diagram(filename):
     cbar.set_ticks([1.2, 1.8])
     cbar.set_ticklabels([1.2, 1.8])
     plt.xlabel("$l_p/w$")
-    plt.ylabel(r"Pe$_{\mathrm{f}}$/Pe$_{\mathrm{s}}$")
+    plt.ylabel("$Pe_f/Pe_s$")
 
     # Normalise divergent colormap
     norm_vx = colors.TwoSlopeNorm(vmin=VX.min(), vcenter=0, vmax=VX.max())
@@ -49,7 +52,7 @@ def phase_diagram(filename):
     plt.pcolormesh(X, Y, VX, cmap='bwr', shading='auto', norm=norm_vx)
     plt.colorbar(label=r'mean longitudinal velocity [$\sigma D_r$]')
     plt.xlabel("$l_p/w$")
-    plt.ylabel(r"Pe$_{\mathrm{f}}$/Pe$_{\mathrm{s}}$")
+    plt.ylabel("$Pe_f/Pe_s$")
 
     # Plot trapping fraction    
     fig = plt.figure(figsize=[8, 6])
@@ -57,7 +60,7 @@ def phase_diagram(filename):
     plt.pcolormesh(X, Y, TF, cmap='viridis', shading='auto')
     plt.colorbar(label='trapping fraction')
     plt.xlabel("$l_p/w$")
-    plt.ylabel(r"Pe$_{\mathrm{f}}$/Pe$_{\mathrm{s}}$")
+    plt.ylabel("$Pe_f/Pe_s$")
 
     plt.tight_layout()
     plt.show()
@@ -100,12 +103,12 @@ def pd_comparison(filename1, filename2):
         mesh1 = axes[0].pcolormesh(X1, Y1, data1, cmap=cmap, shading='auto', vmin=vmin, vmax=vmax)
         axes[0].set_title('Shear effects')
         axes[0].set_xlabel("$l_p/w$")
-        axes[0].set_ylabel(r"Pe$_{\mathrm{f}}$/Pe$_{\mathrm{s}}$")
+        axes[0].set_ylabel("$Pe_f/Pe_s$")
 
         mesh2 = axes[1].pcolormesh(X2, Y2, data2, cmap=cmap, shading='auto', vmin=vmin, vmax=vmax)
         axes[1].set_title('No shear effects')
         axes[1].set_xlabel("$l_p/w$")
-        axes[1].set_ylabel(r"Pe$_{\mathrm{f}}$/Pe$_{\mathrm{s}}$")
+        axes[1].set_ylabel("$Pe_f/Pe_s$")
 
         fig.suptitle("ABP Channel Phase Diagram Comparison")
         fig.colorbar(mesh2, ax=axes, location='right', label=label)
@@ -121,7 +124,7 @@ def pd_comparison(filename1, filename2):
     mesh1 = axes[0].pcolormesh(X1, Y1, A1, cmap=cmap, shading='auto')
     axes[0].set_title('shear effects')
     axes[0].set_xlabel("$l_p/w$")
-    axes[0].set_ylabel(r"Pe$_{\mathrm{f}}$/Pe$_{\mathrm{s}}$")
+    axes[0].set_ylabel("$Pe_f/Pe_s$")
     mesh2 = axes[1].pcolormesh(X2, Y2, A2, cmap=cmap, shading='auto')
     axes[1].set_title('no shear effects')
     axes[1].set_xlabel("$l_p/w$")
@@ -140,7 +143,7 @@ def pd_comparison(filename1, filename2):
     mesh1 = axes[0].pcolormesh(X1, Y1, VX1, cmap='bwr', shading='auto', norm=norm_vx)
     axes[0].set_title('shear effects')
     axes[0].set_xlabel("$l_p/w$")
-    axes[0].set_ylabel(r"Pe$_{\mathrm{f}}$/Pe$_{\mathrm{s}}$")
+    axes[0].set_ylabel("$Pe_f/Pe_s$")
     mesh2 = axes[1].pcolormesh(X2, Y2, VX2, cmap='bwr', shading='auto', norm=norm_vx)
     axes[1].set_title('no shear effects')
     axes[1].set_xlabel("$l_p/w$")
@@ -154,7 +157,7 @@ def pd_comparison(filename1, filename2):
     mesh1 = axes[0].pcolormesh(X1, Y1, TF1, cmap='viridis', shading='auto', vmin=vmin, vmax=vmax)
     axes[0].set_title('shear effects')
     axes[0].set_xlabel("$l_p/w$")
-    axes[0].set_ylabel(r"Pe$_{\mathrm{f}}$/Pe$_{\mathrm{s}}$")
+    axes[0].set_ylabel("$Pe_f/Pe_s$")
     mesh2 = axes[1].pcolormesh(X2, Y2, TF2, cmap='viridis', shading='auto', vmin=vmin, vmax=vmax)
     axes[1].set_title('no shear effects')
     axes[1].set_xlabel("$l_p/w$")
@@ -187,15 +190,79 @@ def pdx_comparison(filename1):
     mesh1 = axes[0].pcolormesh(X, Y, A, cmap='viridis', shading='auto', vmin=vmin, vmax=vmax)
     axes[0].set_title('Total MSD')
     axes[0].set_xlabel("$l_p/w$")
-    axes[0].set_ylabel(r"Pe$_{\mathrm{f}}$/Pe$_{\mathrm{s}}$")
+    axes[0].set_ylabel("$Pe_f/Pe_s$")
 
     mesh2 = axes[1].pcolormesh(X, Y, A_x, cmap='viridis', shading='auto', vmin=vmin, vmax=vmax)
     axes[1].set_title('Longitudinal MSD')
     axes[1].set_xlabel("$l_p/w$")
-    axes[1].set_ylabel(r"Pe$_{\mathrm{f}}$/Pe$_{\mathrm{s}}$")
+    axes[1].set_ylabel("$Pe_f/Pe_s$")
 
     fig.colorbar(mesh2, ax=axes, location='right', label=r"MSD scaling exponent, $\alpha$")
     plt.show()
+
+def big_histogram(folder):
+    """
+    Construct the three histograms from a large set of data, made up of many smaller files
+    contained in folder.
+    
+    Arguments:
+        folder: directory containing the data files
+    """
+    pdf1_total = 0
+    pdf2_total = 0
+    pdf3_total = 0
+
+    # Read every file in folder and sum together the counts
+    for file in Path(f"./{folder}").glob("data_*.npz"):
+        data = np.load(file)
+        pdf1_total += data['pdf1']
+        pdf2_total += data['pdf2']
+        pdf3_total += data['pdf3']
+    
+    # Save edges from most recent instance of data
+    edges1 = data['edges1']
+    edges2 = data['edges2']
+    edges3 = data['edges3']
+
+    # Normalise the counts
+    bin_width1 = edges1[1] - edges1[0]   
+    pdf1 = pdf1_total / (pdf1_total.sum() * bin_width1)
+    bin_width2 = edges2[1] - edges2[0]   
+    pdf2 = pdf2_total / (pdf2_total.sum() * bin_width2)
+    bin_width3 = edges3[1] - edges3[0]   
+    pdf3 = pdf3_total / (pdf3_total.sum() * bin_width3)
+
+    # Extract parameters from folder name
+    _, lp_w, Pf_Ps, G = folder.split("_")
+
+    # Plot the three histograms
+    fig = plt.figure(figsize=[8, 6])
+    plt.stairs(pdf1, edges1, color='black')
+    plt.title(f"Spatial distribution: $l_p/w$ = {lp_w}, $Pe_f/Pe_s$ = {Pf_Ps}, $G$ = {G}")
+    plt.xlabel("height along channel, $y/w$")
+    plt.ylabel("probability density, $P(y/w)$")
+    plt.xlim(0, 1)
+
+    fig = plt.figure(figsize=[8, 6])
+    plt.stairs(pdf2, edges2, color='black')
+    plt.title(f"Orientational distribution: $l_p/w$ = {lp_w}, $Pe_f/Pe_s$ = {Pf_Ps}, $G$ = {G}")
+    plt.xlabel(r"orientation angle, $\theta$")
+    plt.ylabel(r"probability density, $P(\theta)$")
+    plt.xlim(-np.pi, np.pi)
+    plt.xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
+    
+    fig = plt.figure(figsize=[8, 6])
+    plt.stairs(pdf3, edges3, color='black')
+    plt.title(f"Orientational distribution (trapped): $l_p/w$ = {lp_w}, $Pe_f/Pe_s$ = {Pf_Ps}, $G$ = {G}")
+    plt.xlabel(r"orientation angle, $\theta$")
+    plt.ylabel(r"probability density, $P(\theta)$")
+    plt.xlim(-np.pi, np.pi)
+    plt.xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
+
+    plt.tight_layout()
+    plt.show()
+
+
 
 if __name__ == "__main__":
     # Parse command line arguments
@@ -205,6 +272,8 @@ if __name__ == "__main__":
     parser.add_argument('--PD', action='store_true', help='Construct the phase diagram')
     parser.add_argument('--PD2', action='store_true', help='Compare the phase diagrams of systems with/without shear')
     parser.add_argument('--PDX', action='store_true', help='Compare the phase diagrams of alpha for total displacement and longitudinal displacement')
+    parser.add_argument('-F', type=str, default=None, help='Folder containing data files')
+    parser.add_argument('--hist', action='store_true', help='Construct histograms from saved data')
     args = parser.parse_args()
 
     if args.PD:
@@ -213,3 +282,5 @@ if __name__ == "__main__":
         pd_comparison(args.f, args.f2)
     if args.PDX:
         pdx_comparison(args.f)
+    if args.hist:
+        big_histogram(args.F)

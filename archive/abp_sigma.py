@@ -10,6 +10,7 @@ plt.style.use('science')
 plt.rcParams['text.usetex'] = False
 
 # Developer tools ;)
+d_crit = 2**(1/6)
 d = 2
 noise_t = 1
 noise_r = 1
@@ -17,7 +18,7 @@ use_arrows = False
 centre_start = False
 
 @njit
-def run(N, r, e, T, dt, Ps, D, Pf, G):
+def run(N, r, e, T, dt, w, Ps, D, mu, Pf, G):
     """
     Run the simulation for T timesteps, recording all positions and orientations.
 
@@ -27,8 +28,10 @@ def run(N, r, e, T, dt, Ps, D, Pf, G):
         e: particle orientations
         T: total number of timesteps
         dt: timestep
+        w: width of the channel
         Ps: swim Peclet number
         D: diffusion number
+        mu: repulsion number
         Pf: flow Peclet number
         G: elongation factor
 
@@ -49,7 +52,7 @@ def run(N, r, e, T, dt, Ps, D, Pf, G):
         # Update position and orientation
         r_old = r.copy()
         e_old = e.copy()
-        r, e = update(N, r_old, e_old, dt, Ps, D, Pf, G)
+        r, e = update(N, r_old, e_old, dt, w, Ps, D, mu, Pf, G)
         # Store position and orientation of each particle
         for j in range(N):
             for k in range(2):
@@ -58,7 +61,7 @@ def run(N, r, e, T, dt, Ps, D, Pf, G):
     return pos_H, pos_O   
 
 @njit
-def update(N, r, e, dt, Ps, D, Pf, G):
+def update(N, r, e, dt, w, Ps, D, mu, Pf, G):
         """
         Update the positions and orientations of each particle.
         
@@ -67,8 +70,10 @@ def update(N, r, e, dt, Ps, D, Pf, G):
             r: particle positions
             e: particle orientations
             dt: timestep
+            w: width of the channel
             Ps: swim Peclet number
             D: diffusion number
+            mu: repulsion number
             Pf: flow Peclet number
             G: elongation factor
 
@@ -80,32 +85,54 @@ def update(N, r, e, dt, Ps, D, Pf, G):
         e_new = np.zeros_like(e)
         # Iterate over every particle
         for i in range(N):
-            # Compute swim velocity term
-            r_swim = dt * Ps * e[i] 
+            # Compute active velocity term
+            r_active = dt * Ps * e[i] 
             # Generate translational noise term
             r_noise = noise_t * np.sqrt(2 * dt) * D * np.random.normal(0, 1, 2) 
             # Update position via forward difference scheme
-            r_new[i] = r[i] + r_swim + r_noise
+            r_new[i] = r[i] + r_active + r_noise
             # Incorporate correction due to fluid flow
-            r_new[i, 0] += 4 * dt * Pf * r[i, 1] * (1 - r[i, 1]) 
-            # Impose reflection at boundaries
-            if r_new[i, 1] <= 0:
-                r_new[i, 1] *= -1
-            elif r_new[i, 1] >= 1:
-                r_new[i, 1] = 2 - r_new[i, 1]
+            r_new[i, 0] += dt * Pf * 4 * r[i, 1] / w * (1 - r[i, 1] / w) 
+            # Initialise correction due to repulsive interactions with obstacles
+            correction = np.zeros(2)
+            # Check for obstacles
+            if r[i, 1] < d_crit:
+                # Add repulsive interaction due to lower wall
+                sep = np.array([0, r[i, 1]])
+                correction += repulsion(sep)
+            if (w - r[i, 1]) < d_crit:
+                # Add repulsive interaction due to upper wall
+                sep = np.array([0, (r[i, 1] - w)])
+                correction += repulsion(sep)
+            r_new[i] += dt * mu * correction
             # Update orientation
-            e_new[i] = orientation(e[i], dt, Pf, r[i, 1], G)
+            e_new[i] = orientation(e[i], dt, w, Pf, r[i, 1], G)
         # Return updated position and orientation vectors
         return r_new, e_new
 
 @njit
-def orientation(e, dt, Pf, y, G):
+def repulsion(sep):
+    """
+    Calculate correction due to repulsive interactions with obstactle.
+    
+    Arguments:
+        sep: separation vector from particle to obstacle
+    
+    Returns:
+        repulsive force acting on particle
+    """
+    r = np.linalg.norm(sep)
+    return 24 * (2 / r**14 - 1 / r**8) * sep
+
+@njit
+def orientation(e, dt, w, Pf, y, G):
     """
     Calculate and return the new orientation vector in 2D via rotation matrix update.
     
     Arguments:
         e: original orientation vector
         dt: timestep
+        w: width of channel
         Pf: flow Peclet number
         y: height of particle within channel
         G: elongation factor
@@ -115,30 +142,33 @@ def orientation(e, dt, Pf, y, G):
     """
     # Calculate change in orientation due to rotational noise
     d_theta_noise = noise_r * np.sqrt(2 * dt) * np.random.normal(0, 1) 
+    # Calculate change in orientation due to angular velocity from flow profile
+    d_theta_flow = dt * Pf * 2 / w * (2 * y / w - 1) 
     # Calculate angle from x-axis of the original orientation vector
     theta = np.arctan2(e[1], e[0])
-    # Calculate angular velocity due to vorticity and shear
-    d_theta_omega = 2 * dt * Pf * (1 - 2 * y) * (G * np.cos(2 * theta) - 1)
+    # Calculate contribution due to shear
+    d_theta_shear = G * dt * Pf * 2 / w * (1 - 2 * y / w) * np.cos(2 * theta)
     # Calculate new angle
-    new_theta = theta + d_theta_noise + d_theta_omega
+    new_theta = theta + d_theta_noise + d_theta_flow + d_theta_shear
     # Return updated orientation vector
     return np.array([np.cos(new_theta), np.sin(new_theta)])
 
 @njit
-def positions(N):
+def positions(N, width):
     """
     Generate the positions of N particles near the beginning of a channel.
     
     Arguments:
         N: number of particles
+        width: width of channel
     
     Returns:
         r: positions of each particle
     """
-    x_min = 0
-    x_max = 0.5
-    y_min = 0
-    y_max = 1
+    x_min = d_crit - width / 2
+    x_max = width / 2 - d_crit
+    y_min = d_crit
+    y_max = width - d_crit
     # Initialise positions
     r = np.zeros((N, 2))
     # Randomly choose x and y components within specified range
@@ -154,7 +184,7 @@ class ABP:
     An ensemble of active Brownian particles submerged in fluid, for a given system geometry (2D).
     """
 
-    def __init__(self, N, T, dt, Ps, D, Pf, G):
+    def __init__(self, N, T, dt, width, Ps, D, mu, Pf, G):
         """
         Initialise N realisations of the same particle at the origin with random orientations.
         
@@ -162,8 +192,10 @@ class ABP:
             N: number of realisations of the particle
             T: total number of timesteps
             dt: timestep
+            width: width of channel
             Ps: swim Peclet number
             D: diffusion number
+            mu: repulsion number
             Pf: flow Peclet number
             G: geometrical elongation factor        
         """
@@ -171,20 +203,24 @@ class ABP:
         self.N = N
         self.T = T
         self.dt = dt
+        self.width = width
         self.Ps = Ps
         self.D = D
+        self.mu = mu
         self.Pf = Pf
         self.G = G
         self.step = int(1 / dt)
+        self.lp_w = Ps / width
+        self.Pf_Ps = Pf / Ps
         # Initialise orientation vector of each particle from a uniform rotationally symmetric distribution
         distribution = uniform_direction(2)
         self.e = distribution.rvs(N)
         # Initialise positions
         if centre_start:
-            self.r = np.full((N, 2), [0, 0.5])
+            self.r = np.full((N, 2), [0, width/2])
             self.e = np.full((N, 2), [1/np.sqrt(2), 1/np.sqrt(2)])
         else:
-            self.r = positions(N)
+            self.r = positions(N, width)
         
  
     def Run(self):
@@ -196,7 +232,7 @@ class ABP:
             orient: orientation history of each particle
         """
         # Run simulation and retrieve data
-        pos, orient = run(self.N, self.r, self.e, self.T, self.dt, self.Ps, self.D, self.Pf, self.G)
+        pos, orient = run(self.N, self.r, self.e, self.T, self.dt, self.width, self.Ps, self.D, self.mu, self.Pf, self.G)
         return pos, orient        
 
 
@@ -299,15 +335,15 @@ class ABP:
         msd_fit = np.exp(b) * t_fit**a
         # Plot MSD with fit and theory lines
         fig = plt.figure(figsize=[8, 6])
-        plt.title(f"Mean Square Displacement: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
+        plt.title(f"Mean Square Displacement: $l_p/w$ = {self.lp_w}, $Pe_f/Pe_s$ = {self.Pf_Ps}, $G$ = {self.G}")
         plt.scatter(t, msd, color='black', marker='.', s=10, label='simulation')
         plt.loglog(t, msd_theory, color='red', linestyle='--', label='theory')
         plt.loglog(t, msd_b, color='blue', linestyle='--', label='ballistic')
         plt.loglog(t, msd_d, color='green', linestyle='--', label='diffusive')
         plt.loglog(t_fit, msd_fit, color='magenta', label=r'$\alpha$ = ' + f'{np.round(a, 2)}')
         plt.axvline(tau, color='black', linestyle='dotted', label=r'$\tau_r$')
-        plt.xlabel("$tD_r$")
-        plt.ylabel(r"$\langle (r/w)^2 \rangle$")
+        plt.xlabel(r"time [$1/D_r$]")
+        plt.ylabel(r"$\langle r^2 \rangle$ [$\sigma^2$]")
         plt.legend()
 
         # Calculate MSD in the x-direction and line of best fit fit
@@ -316,15 +352,15 @@ class ABP:
         msd_fit_x = np.exp(b_x) * t_fit**a_x
 
         fig = plt.figure(figsize=[8, 6])
-        plt.title(f"Longitudinal MSD: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
+        plt.title(f"Longitudinal MSD: $l_p/w$ = {self.lp_w}, $Pe_f/Pe_s$ = {self.Pf_Ps}, $G$ = {self.G}")
         plt.scatter(t, msd_x, color='black', marker='.', s=10, label='simulation')
         plt.loglog(t, msd_theory/2, color='red', linestyle='--', label='theory')
         plt.loglog(t, msd_b/2, color='blue', linestyle='--', label='ballistic')
         plt.loglog(t, msd_d/2, color='green', linestyle='--', label='diffusive')
         plt.loglog(t_fit, msd_fit_x, color='magenta', label=r'$\alpha$ = ' + f'{np.round(a_x, 2)}')
         plt.axvline(tau, color='black', linestyle='dotted', label=r'$\tau_r$')
-        plt.xlabel("$tD_r$")
-        plt.ylabel(r"$\langle (x/w)^2 \rangle$")
+        plt.xlabel(r"time [$1/D_r$]")
+        plt.ylabel(r"$\langle x^2 \rangle$ [$\sigma^2$]")
         plt.legend()
 
         # Calculate MSD in the y-direction and line of best fit fit
@@ -333,15 +369,15 @@ class ABP:
         msd_fit_y = np.exp(b_y) * t_fit**a_y
 
         fig = plt.figure(figsize=[8, 6])
-        plt.title(f"Transverse MSD: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
+        plt.title(f"Transverse MSD: $l_p/w$ = {self.lp_w}, $Pe_f/Pe_s$ = {self.Pf_Ps}, $G$ = {self.G}")
         plt.scatter(t, msd_y, color='black', marker='.', s=10, label='simulation')
         plt.loglog(t, msd_theory/2, color='red', linestyle='--', label='theory')
         plt.loglog(t, msd_b/2, color='blue', linestyle='--', label='ballistic')
         plt.loglog(t, msd_d/2, color='green', linestyle='--', label='diffusive')
         plt.loglog(t_fit, msd_fit_y, color='magenta', label=r'$\alpha$ = ' + f'{np.round(a_y, 2)}')
         plt.axvline(tau, color='black', linestyle='dotted', label=r'$\tau_r$')
-        plt.xlabel("$tD_r$")
-        plt.ylabel(r"$\langle (y/w)^2 \rangle$")
+        plt.xlabel(r"time [$1/D_r$]")
+        plt.ylabel(r"$\langle y^2 \rangle$ [$\sigma^2$]")
         plt.legend()
 
         plt.tight_layout()
@@ -358,7 +394,7 @@ class ABP:
             data1: orientation history
         """
         fig = plt.figure(figsize=[8, 6])
-        plt.title(f"Particle trajectory: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
+        plt.title(f"Particle trajectory: $l_p/w$ = {self.lp_w}, $Pe_f/Pe_s$ = {self.Pf_Ps}, $G$ = {self.G}")
         
         # Consider only first particle
         x, y = data[:, 0, 0], data[:, 0, 1]
@@ -367,10 +403,9 @@ class ABP:
         end_x, end_y = data[-1, 0, 0], data[-1, 0, 1]
         plt.scatter(end_x, end_y, color='red', s=20, zorder=1)
         plt.scatter(x, y, color='black', marker='.', s=1, zorder=-1)
-        plt.xlabel(r"$x/w$")
-        plt.ylabel(r"$y/w$")
-        plt.axhline(0, color='black', linestyle='--', alpha=0.5)
-        plt.axhline(1, color='black', linestyle='--', alpha=0.5)
+        plt.xlabel(r"$x$ position [$\sigma$]")
+        plt.ylabel(r"$y$ position [$\sigma$]")
+        plt.ylim(0, self.width)
         # Plot early-time orientations along trajectory
         if use_arrows:
             # Create array of arrow directions
@@ -423,10 +458,9 @@ class ABP:
         """
         fig = plt.figure(figsize=[8, 6])
         plt.title("Initial Configuration")
-        plt.xlabel(r"$x/w$")
-        plt.ylabel(r"$y/w$")
-        plt.axhline(0, color='black', linestyle='--', alpha=0.5)
-        plt.axhline(1, color='black', linestyle='--', alpha=0.5)
+        plt.ylim(0, self.width)
+        plt.xlabel(r"$x$ position [$\sigma$]")
+        plt.ylabel(r"$y$ position [$\sigma$]")
         # Plot position and orientation of each particle
         for i in range(self.N):
             x, y = self.r[i, 0], self.r[i, 1]
@@ -450,7 +484,7 @@ class ABP:
         # Extract y-position history and align with shape of x-velocity array
         y = p[:, :, 1]
         # Return trapping condition
-        return (vx < 0) & ((y < 0.05) | (y > 0.95))
+        return (vx < 0) & ((y < 1.5) | (y > (self.width - 1.5)))
 
     def PDF(self, pos, orient):
         """
@@ -466,14 +500,14 @@ class ABP:
         o = orient[::self.step][10:-1]
         
         # Isolate vertical position from position data
-        y = p[:, :, 1].flatten()
+        y = p[:, :, 1].flatten() / self.width
 
         # Construct positional PDF
         pdf1, edges1 = np.histogram(y, bins=50, density=True)
 
         fig = plt.figure(figsize=[8, 6])
         plt.stairs(pdf1, edges1, color='black')
-        plt.title(f"Spatial distribution: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
+        plt.title(f"Spatial distribution: $l_p/w$ = {self.lp_w}, $Pe_f/Pe_s$ = {self.Pf_Ps}, $G$ = {self.G}")
         plt.xlabel("height along channel, $y/w$")
         plt.ylabel("probability density, $P(y/w)$")
         plt.xlim(0, 1)
@@ -486,7 +520,7 @@ class ABP:
 
         fig = plt.figure(figsize=[8, 6])
         plt.stairs(pdf2, edges2, color='black')
-        plt.title(f"Orientational distribution: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
+        plt.title(f"Orientational distribution: $l_p/w$ = {self.lp_w}, $Pe_f/Pe_s$ = {self.Pf_Ps}, $G$ = {self.G}")
         plt.xlabel(r"orientation angle, $\theta$")
         plt.ylabel(r"probability density, $P(\theta)$")
         plt.xlim(-np.pi, np.pi)
@@ -503,7 +537,7 @@ class ABP:
 
         fig = plt.figure(figsize=[8, 6])
         plt.stairs(pdf3, edges3, color='black')
-        plt.title(f"Orientational distribution (trapped): $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
+        plt.title(f"Orientational distribution (trapped): $l_p/w$ = {self.lp_w}, $Pe_f/Pe_s$ = {self.Pf_Ps}, $G$ = {self.G}")
         plt.xlabel(r"orientation angle, $\theta$")
         plt.ylabel(r"probability density, $P(\theta)$")
         plt.xlim(-np.pi, np.pi)
@@ -525,14 +559,16 @@ if __name__ == "__main__":
     parser.add_argument('--FPTD', action='store_true', help='Obtain first-passage time distribution')
     parser.add_argument('-T', type=int, default=100000, help='Number of timesteps over which to run the simulation')
     parser.add_argument('-Ps', type=float, default=5, help='Swim Peclet number')
+    parser.add_argument('-mu', type=float, default=10, help='Dimensionless force constant')
+    parser.add_argument('-w',  type=float, default=10, help='Width of channel')
     parser.add_argument('-Pf', type=float, default=5, help='Flow Peclet number')
     parser.add_argument('-D', type=float, default=1, help='Dimensionless ratio of diffusion constants')
     parser.add_argument('-x', type=float, default=50, help='Distance along x-axis to check for first-passage')
-    parser.add_argument('-G', type=float, default=0, help='Geometrical factor related to particle aspect ratio')
+    parser.add_argument('-G', type=float, default=1, help='Geometrical factor related to particle aspect ratio')
     parser.add_argument('--init', action='store_true', help='View the initial configuration of the system')
     args = parser.parse_args()
 
-    abp = ABP(args.N, args.T, args.dt, args.Ps, args.D, args.Pf, args.G)
+    abp = ABP(args.N, args.T, args.dt, args.w, args.Ps, args.D, args.mu, args.Pf, args.G)
 
     if args.init:
         abp.initial_config()
