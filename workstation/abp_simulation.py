@@ -45,7 +45,7 @@ def phase_diagram(filename, N, T, dt, D, l1, u1, l2, u2, n, G):
                 _, msd = abp.get_MSD(pos)
                 a, _ = abp.get_MSD_fit(msd)
                 vx = abp.get_xspeed(pos)
-                vx_independent = vx[::abp.step]
+                vx_independent = vx[::abp.step][10:]
                 trap = abp.trapping_index(p, vx_independent)
                 trap_frac = np.count_nonzero(trap) / np.size(trap)
                 mean_vx = np.mean(vx_independent)

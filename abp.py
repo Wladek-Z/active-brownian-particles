@@ -17,13 +17,13 @@ use_arrows = False
 centre_start = False
 
 @njit
-def run(N, r, e, T, dt, Ps, D, Pf, G):
+def run(N, p, e, T, dt, Ps, D, Pf, G):
     """
     Run the simulation for T timesteps, recording all positions and orientations.
 
     Arguments:
         N: number of particles
-        r: particle positions
+        p: particle positions
         e: particle orientations
         T: total number of timesteps
         dt: timestep
@@ -33,38 +33,38 @@ def run(N, r, e, T, dt, Ps, D, Pf, G):
         G: elongation factor
 
     Returns:
-        pos_H: history of positions
-        pos_O: history of orientations
+        p_hist: history of positions
+        o_hist: history of orientations
     """
     # Initialise arrays to keep track of position/orientation data
-    pos_H = np.zeros((T+1, N, 2))
-    pos_O = np.zeros((T+1, N, 2))
+    p_hist = np.zeros((T+1, N, 2))
+    o_hist = np.zeros((T+1, N, 2))
     # Store position and orientation of each particle
     for j in range(N):
         for k in range(2):
-            pos_H[0, j, k] = r[j, k]
-            pos_O[0, j, k] = e[j, k]
+            p_hist[0, j, k] = p[j, k]
+            o_hist[0, j, k] = e[j, k]
     # Perform T iterations of the update procedure
     for i in range(1, T+1):
         # Update position and orientation
-        r_old = r.copy()
+        p_old = p.copy()
         e_old = e.copy()
-        r, e = update(N, r_old, e_old, dt, Ps, D, Pf, G)
+        p, e = update(N, p_old, e_old, dt, Ps, D, Pf, G)
         # Store position and orientation of each particle
         for j in range(N):
             for k in range(2):
-                pos_H[i, j, k] = r[j, k]
-                pos_O[i, j, k] = e[j, k]
-    return pos_H, pos_O   
+                p_hist[i, j, k] = p[j, k]
+                o_hist[i, j, k] = e[j, k]
+    return p_hist, o_hist   
 
 @njit
-def update(N, r, e, dt, Ps, D, Pf, G):
+def update(N, p, e, dt, Ps, D, Pf, G):
         """
         Update the positions and orientations of each particle.
         
         Arguments:
             N: number of particles
-            r: particle positions
+            p: particle positions
             e: particle orientations
             dt: timestep
             Ps: swim Peclet number
@@ -76,27 +76,27 @@ def update(N, r, e, dt, Ps, D, Pf, G):
             r_new: updated positions
             e_new: updated orientations
         """
-        r_new = np.zeros_like(r)
+        p_new = np.zeros_like(p)
         e_new = np.zeros_like(e)
         # Iterate over every particle
         for i in range(N):
             # Compute swim velocity term
-            r_swim = dt * Ps * e[i] 
+            p_swim = dt * Ps * e[i] 
             # Generate translational noise term
-            r_noise = noise_t * np.sqrt(2 * dt) * D * np.random.normal(0, 1, 2) 
+            p_noise = noise_t * np.sqrt(2 * dt) * D * np.random.normal(0, 1, 2) 
             # Update position via forward difference scheme
-            r_new[i] = r[i] + r_swim + r_noise
+            p_new[i] = p[i] + p_swim + p_noise
             # Incorporate correction due to fluid flow
-            r_new[i, 0] += 4 * dt * Pf * r[i, 1] * (1 - r[i, 1]) 
+            p_new[i, 0] += 4 * dt * Pf * p[i, 1] * (1 - p[i, 1]) 
             # Impose reflection at boundaries
-            if r_new[i, 1] <= 0:
-                r_new[i, 1] *= -1
-            elif r_new[i, 1] >= 1:
-                r_new[i, 1] = 2 - r_new[i, 1]
+            if p_new[i, 1] <= 0:
+                p_new[i, 1] *= -1
+            elif p_new[i, 1] >= 1:
+                p_new[i, 1] = 2 - p_new[i, 1]
             # Update orientation
-            e_new[i] = orientation(e[i], dt, Pf, r[i, 1], G)
+            e_new[i] = orientation(e[i], dt, Pf, p[i, 1], G)
         # Return updated position and orientation vectors
-        return r_new, e_new
+        return p_new, e_new
 
 @njit
 def orientation(e, dt, Pf, y, G):
