@@ -308,7 +308,7 @@ class ABP:
         plt.axvline(tau, color='black', linestyle='dotted', label=r'$\tau_r$')
         plt.xlabel("$tD_r$")
         plt.ylabel(r"$\langle (r/w)^2 \rangle$")
-        plt.legend()
+        plt.legend(loc='upper right')
 
         # Calculate MSD in the x-direction and line of best fit fit
         msd_x = msd_xy[:, 0]
@@ -325,7 +325,7 @@ class ABP:
         plt.axvline(tau, color='black', linestyle='dotted', label=r'$\tau_r$')
         plt.xlabel("$tD_r$")
         plt.ylabel(r"$\langle (x/w)^2 \rangle$")
-        plt.legend()
+        plt.legend(loc='upper right')
 
         # Calculate MSD in the y-direction and line of best fit fit
         msd_y = msd_xy[:, 1]
@@ -342,7 +342,7 @@ class ABP:
         plt.axvline(tau, color='black', linestyle='dotted', label=r'$\tau_r$')
         plt.xlabel("$tD_r$")
         plt.ylabel(r"$\langle (y/w)^2 \rangle$")
-        plt.legend()
+        plt.legend(loc='upper right')
 
         plt.tight_layout()
         plt.show()
@@ -367,20 +367,19 @@ class ABP:
         end_x, end_y = data[-1, 0, 0], data[-1, 0, 1]
         plt.scatter(end_x, end_y, color='red', s=20, zorder=1)
         plt.scatter(x, y, color='black', marker='.', s=1, zorder=-1)
+        #plt.plot(x, y, color='black', zorder=-1)
         plt.xlabel(r"$x/w$")
         plt.ylabel(r"$y/w$")
         plt.axhline(0, color='black', linestyle='--', alpha=0.5)
         plt.axhline(1, color='black', linestyle='--', alpha=0.5)
         # Plot early-time orientations along trajectory
         if use_arrows:
+            spacing = 2000
             # Create array of arrow directions
-            limit = int(self.T / 10)
-            dx, dy = data1[:limit, 0, 0], data1[:limit, 0, 1]
-            spacing = max(100, limit // 50)
+            dx, dy = data1[:, 0, 0], data1[:, 0, 1]
             dx, dy = dx[::spacing], dy[::spacing]
             # Create array of arrow bases
-            X, Y = x[:limit], y[:limit]
-            X, Y = X[::spacing], Y[::spacing]
+            X, Y = x[::spacing], y[::spacing]
             # Make quiver plot
             plt.quiver(X, Y, dx, dy, color='red', width=0.002, headwidth=3, headlength=4, scale=25, zorder=-1)
         plt.tight_layout()
@@ -517,7 +516,7 @@ class ABP:
 if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('-N', type=int, default=100, help='Number of realisations of the ABP')
+    parser.add_argument('-N', type=int, default=500, help='Number of realisations of the ABP')
     parser.add_argument('-dt', type=float, default=0.001, help='Simulation timestep')
     parser.add_argument('--MSD', action='store_true', help='Obtain the mean square displacement')
     parser.add_argument('--trajectory', action='store_true', help='Display the particle trajectory')
