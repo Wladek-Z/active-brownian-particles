@@ -50,7 +50,7 @@ def phase_diagram(filename):
     fig = plt.figure(figsize=[8, 6])
     plt.title("ABP channel phase diagram")
     plt.pcolormesh(X, Y, VX, cmap='bwr', shading='auto', norm=norm_vx)
-    plt.colorbar(label=r'mean longitudinal velocity [$\sigma D_r$]')
+    plt.colorbar(label=r'$\langle v_x \rangle/wD_r$')
     plt.xlabel("$l_p/w$")
     plt.ylabel("$Pe_f/Pe_s$")
 
@@ -148,7 +148,7 @@ def pd_comparison(filename1, filename2):
     axes[1].set_title('no shear effects')
     axes[1].set_xlabel("$l_p/w$")
     fig.suptitle("ABP channel phase diagram comparison")
-    fig.colorbar(mesh2, ax=axes, location='right', label=r"mean longitudinal velocity [$\sigma D_r$]")
+    fig.colorbar(mesh2, ax=axes, location='right', label=r"$\langle v_x \rangle/wD_r$")
 
     # Plot trapping fraction comparison
     vmin = min(np.nanmin(TF1), np.nanmin(TF2))
