@@ -106,7 +106,7 @@ def update(N, r, e, dt, w, Ps, D, mu, Pf, G):
                 correction += repulsion(sep)
             r_new[i] += dt * mu * correction
             # Update orientation
-            e_new[i] = orientation(e[i], dt, w, Pf, r[i, 1], G)
+            e_new[i] = orientation(e[i], dt, w, Pf, r_new[i, 1], G)
         # Return updated position and orientation vectors
         return r_new, e_new
 

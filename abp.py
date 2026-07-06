@@ -11,6 +11,7 @@ plt.rcParams['text.usetex'] = False
 
 # Developer tools ;)
 d = 2
+flow = 1
 noise_t = 1
 noise_r = 1
 use_arrows = False
@@ -89,12 +90,10 @@ def update(N, p, e, dt, Ps, D, Pf, G):
             # Incorporate correction due to fluid flow
             p_new[i, 0] += 4 * dt * Pf * p[i, 1] * (1 - p[i, 1]) 
             # Impose reflection at boundaries
-            if p_new[i, 1] <= 0:
-                p_new[i, 1] *= -1
-            elif p_new[i, 1] >= 1:
-                p_new[i, 1] = 2 - p_new[i, 1]
+            if p_new[i, 1] < 0 or p_new[i, 1] > 1:
+                p_new[i, 1] = p[i, 1]
             # Update orientation
-            e_new[i] = orientation(e[i], dt, Pf, p[i, 1], G)
+            e_new[i] = orientation(e[i], dt, Pf, p_new[i, 1], G)
         # Return updated position and orientation vectors
         return p_new, e_new
 
@@ -118,7 +117,7 @@ def orientation(e, dt, Pf, y, G):
     # Calculate angle from x-axis of the original orientation vector
     theta = np.arctan2(e[1], e[0])
     # Calculate angular velocity due to vorticity and shear
-    d_theta_omega = 2 * dt * Pf * (1 - 2 * y) * (G * np.cos(2 * theta) - 1)
+    d_theta_omega = 2 * dt * Pf * (1 - 2 * y) * (G * np.cos(2 * theta) - flow)
     # Calculate new angle
     new_theta = theta + d_theta_noise + d_theta_omega
     # Return updated orientation vector
@@ -212,18 +211,18 @@ class ABP:
             msd_tot: the total mean square displacement
         """
         # Calculate mean square displacement along each Cartesian direction
-        msd_xy = np.mean((data - data[0])**2, axis=1)
+        msd_xy = np.mean((data[1:] - data[0])**2, axis=1)
         # Calculate total mean square displacement
         msd_tot = np.sum(msd_xy, axis=1)
-        # Delete first data point to avoid conflict with logscale
-        return msd_xy[1:], msd_tot[1:]
+        # Return MSDs
+        return msd_xy, msd_tot
     
-    def get_MSD_fit(self, msd):
+    def get_powerlaw(self, data):
         """
-        Obtain the power-law dependence of the late-time mean square displacement.
+        Obtain the late-time power-law dependence of a dataset related to the displacement.
         
         Argument:
-            msd: mean square displacement data
+            data: data to fit
         
         Returns:
             a: fitted power
@@ -235,7 +234,7 @@ class ABP:
         tau = 1 / (d - 1) 
         # Consider only late-time data, i.e. >> tau
         late = t >= 10 * tau
-        y = np.log(msd[late])
+        y = np.log(data[late])
         x = np.log(t[late])
         # Fit to a 1st degree polynomial
         a, b = np.polyfit(x, y, 1)
@@ -282,6 +281,7 @@ class ABP:
         Arguments:
             data: position history
         """
+        # Get MSD
         msd_xy, msd = self.get_MSD(data)
 
         # Create array of measurement times
@@ -294,58 +294,129 @@ class ABP:
         msd_b = self.Ps**2 * t**2 + 2 * d * self.D**2 * t
         msd_d = 2 * t * (d * self.D**2 + self.Ps**2 * tau)
         # Perform fit to late-time data
-        a, b = self.get_MSD_fit(msd)
+        a, b = self.get_powerlaw(msd)
         t_fit = np.linspace(tau/self.dt, self.T, 100) * self.dt
         msd_fit = np.exp(b) * t_fit**a
+        # Calculate MSD at t = 10*tau
+        msd_fit_10 = np.exp(b) * (10*tau)**a
+
         # Plot MSD with fit and theory lines
         fig = plt.figure(figsize=[8, 6])
-        plt.title(f"Mean Square Displacement: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
+        plt.title(f"MSD: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
         plt.scatter(t, msd, color='black', marker='.', s=10, label='simulation')
         plt.loglog(t, msd_theory, color='red', linestyle='--', label='theory')
         plt.loglog(t, msd_b, color='blue', linestyle='--', label='ballistic')
         plt.loglog(t, msd_d, color='green', linestyle='--', label='diffusive')
-        plt.loglog(t_fit, msd_fit, color='magenta', label=r'$\alpha$ = ' + f'{np.round(a, 2)}')
-        plt.axvline(tau, color='black', linestyle='dotted', label=r'$\tau_r$')
+        plt.loglog(t_fit, msd_fit, color='magenta', label=r'$\sim t^{\alpha}$')
+        plt.axvline(tau, color='black', linestyle='dotted', label=r'$t=\tau_r$')
         plt.xlabel("$tD_r$")
-        plt.ylabel(r"$\langle (r/w)^2 \rangle$")
-        plt.legend(loc='upper right')
+        plt.ylabel(r"$\langle (\Delta r)^2 \rangle/w^2$")
+        plt.text(10*tau, 0.75*msd_fit_10, r'$\alpha$ = ' + f'{np.round(a, 2)}', ha='left', va='top', fontsize=12)
+        plt.legend(loc='upper left')
 
         # Calculate MSD in the x-direction and line of best fit fit
         msd_x = msd_xy[:, 0]
-        a_x, b_x = self.get_MSD_fit(msd_x)
-        msd_fit_x = np.exp(b_x) * t_fit**a_x
+        a_x, b_x = self.get_powerlaw(msd_x)
+        msd_x_fit = np.exp(b_x) * t_fit**a_x
+        # Calculate MSD at t = 10*tau
+        msd_x_fit_10 = np.exp(b_x) * (10*tau)**a_x
 
         fig = plt.figure(figsize=[8, 6])
-        plt.title(f"Longitudinal MSD: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
+        plt.title(f"MSD$_x$: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
         plt.scatter(t, msd_x, color='black', marker='.', s=10, label='simulation')
         plt.loglog(t, msd_theory/2, color='red', linestyle='--', label='theory')
         plt.loglog(t, msd_b/2, color='blue', linestyle='--', label='ballistic')
         plt.loglog(t, msd_d/2, color='green', linestyle='--', label='diffusive')
-        plt.loglog(t_fit, msd_fit_x, color='magenta', label=r'$\alpha$ = ' + f'{np.round(a_x, 2)}')
-        plt.axvline(tau, color='black', linestyle='dotted', label=r'$\tau_r$')
+        plt.loglog(t_fit, msd_x_fit, color='magenta', label=r'$\sim t^{\alpha}$')
+        plt.axvline(tau, color='black', linestyle='dotted', label=r'$t=\tau_r$')
         plt.xlabel("$tD_r$")
-        plt.ylabel(r"$\langle (x/w)^2 \rangle$")
-        plt.legend(loc='upper right')
+        plt.ylabel(r"$\langle (\Delta x)^2 \rangle/w^2$")
+        plt.text(10*tau, 0.75*msd_x_fit_10, r'$\alpha$ = ' + f'{np.round(a_x, 2)}', ha='left', va='top', fontsize=12)
+        plt.legend(loc='upper left')
 
         # Calculate MSD in the y-direction and line of best fit fit
         msd_y = msd_xy[:, 1]
-        a_y, b_y = self.get_MSD_fit(msd_y)
-        msd_fit_y = np.exp(b_y) * t_fit**a_y
+        a_y, b_y = self.get_powerlaw(msd_y)
+        msd_y_fit = np.exp(b_y) * t_fit**a_y
+        # Calculate MSD at t = 10*tau
+        msd_y_fit_10 = np.exp(b_y) * (10*tau)**a_y
 
         fig = plt.figure(figsize=[8, 6])
-        plt.title(f"Transverse MSD: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
+        plt.title(f"MSD$_y$: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
         plt.scatter(t, msd_y, color='black', marker='.', s=10, label='simulation')
         plt.loglog(t, msd_theory/2, color='red', linestyle='--', label='theory')
         plt.loglog(t, msd_b/2, color='blue', linestyle='--', label='ballistic')
         plt.loglog(t, msd_d/2, color='green', linestyle='--', label='diffusive')
-        plt.loglog(t_fit, msd_fit_y, color='magenta', label=r'$\alpha$ = ' + f'{np.round(a_y, 2)}')
-        plt.axvline(tau, color='black', linestyle='dotted', label=r'$\tau_r$')
+        plt.loglog(t_fit, msd_y_fit, color='magenta', label=r'$\sim t^{\alpha}$')
+        plt.axvline(tau, color='black', linestyle='dotted', label=r'$t=\tau_r$')
         plt.xlabel("$tD_r$")
-        plt.ylabel(r"$\langle (y/w)^2 \rangle$")
-        plt.legend(loc='upper right')
+        plt.ylabel(r"$\langle (\Delta y)^2 \rangle/w^2$")
+        plt.text(10*tau, 0.5*msd_y_fit_10, r'$\alpha$ = ' + f'{np.round(a_y, 2)}', ha='left', va='top', fontsize=12)
+        plt.legend(loc='upper left')
 
         plt.tight_layout()
         plt.show()
+
+    def get_variance(self, x):
+        """
+        Return the variance of displacement along a single Cartesian direction.
+        
+        Arguments:
+            x: position history in one direction
+        
+        Returns:
+            the variance of the one-dimensional displacement over time
+        """
+        dx = x[1:] - x[0]
+        return np.var(dx, axis=1)
+
+    def Variance(self, data):
+        """
+        Compute the variance of the displacement in the x-direction. Display exponent
+        of time-dependence (beta) and fitted diffusivity if beta < 1.2.
+        
+        Arguments:
+            data: position history
+        """
+        # Get variance
+        var = self.get_variance(data[:, :, 0])
+
+        # Create array of measurement times
+        t = np.arange(1, self.T + 1) * self.dt
+        # Theoretical mean square displacement
+        # Perform fit to variance
+        a, b = self.get_powerlaw(var)
+        # Calculate persistence time
+        tau = 1 / (d - 1) 
+        # Perform fit to late-time data
+        t_fit = np.linspace(tau/self.dt, self.T, 100) * self.dt
+        var_fit = np.exp(b) * t_fit**a
+        # Calculate diffusivity
+        D_fit = np.round(np.exp(b) / 2, 2)
+        # Calculate theoretical (diffusive) variance
+        var_theory = 2 * self.D * t
+        # Calculate variance at t = 10*tau
+        var_fit_10 = np.exp(b) * (10*tau)**a
+
+        # Plot variance with fit, display parameters
+        fig = plt.figure(figsize=[8, 6])
+        plt.title(r"Var($\Delta x$): $l_p/w$ = " + f"{self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
+        plt.scatter(t, var, color='black', marker='.', s=10, label='simulation')
+        plt.loglog(t, var_theory, color='red', linestyle='--', label='2$Dt$')
+        plt.loglog(t_fit, var_fit, color='magenta', label=r'$\sim t^{\beta}$')
+        plt.xlabel("$tD_r$")
+        plt.ylabel(r"$\langle (\Delta x - \langle \Delta x \rangle)^2 \rangle/w^2$")
+        plt.axvline(tau, color='black', linestyle='dotted', label=r'$t=\tau_r$')
+        # Only display fitted diffusivity if motion is late-time diffusive (beta < 1.2)
+        if a < 1.2:
+            plt.text(10*tau, 0.75*var_fit_10, r'$\beta$ = ' + f'{np.round(a, 2)}\n' + r'$D_{\mathrm{fit}}$ = ' + f'{D_fit}', ha='left', va='top', fontsize=12)
+        else:
+            plt.text(10*tau, 0.75*var_fit_10, r'$\beta$ = ' + f'{np.round(a, 2)}', ha='left', va='top')
+        plt.legend(loc='upper left')
+
+        plt.tight_layout()
+        plt.show()
+
 
     def Trajectory(self, data, data1):
         """
@@ -358,7 +429,7 @@ class ABP:
             data1: orientation history
         """
         fig = plt.figure(figsize=[8, 6])
-        plt.title(f"Particle trajectory: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
+        plt.title(f"Trajectory: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
         
         # Consider only first particle
         x, y = data[:, 0, 0], data[:, 0, 1]
@@ -374,7 +445,7 @@ class ABP:
         plt.axhline(1, color='black', linestyle='--', alpha=0.5)
         # Plot early-time orientations along trajectory
         if use_arrows:
-            spacing = 2000
+            spacing = min(2000, self.T // 50)
             # Create array of arrow directions
             dx, dy = data1[:, 0, 0], data1[:, 0, 1]
             dx, dy = dx[::spacing], dy[::spacing]
@@ -521,11 +592,12 @@ if __name__ == "__main__":
     parser.add_argument('--MSD', action='store_true', help='Obtain the mean square displacement')
     parser.add_argument('--trajectory', action='store_true', help='Display the particle trajectory')
     parser.add_argument('--PDF', action='store_true', help='Obtain the probability density functions')
+    parser.add_argument('--variance', action='store_true', help='Obtain the variance of longitudinal displacement')
     parser.add_argument('--FPTD', action='store_true', help='Obtain first-passage time distribution')
     parser.add_argument('-T', type=int, default=100000, help='Number of timesteps over which to run the simulation')
     parser.add_argument('-Ps', type=float, default=5, help='Swim Peclet number')
     parser.add_argument('-Pf', type=float, default=5, help='Flow Peclet number')
-    parser.add_argument('-D', type=float, default=1, help='Dimensionless ratio of diffusion constants')
+    parser.add_argument('-D', type=float, default=0.1, help='Dimensionless ratio of diffusion constants')
     parser.add_argument('-x', type=float, default=50, help='Distance along x-axis to check for first-passage')
     parser.add_argument('-G', type=float, default=0, help='Geometrical factor related to particle aspect ratio')
     parser.add_argument('--init', action='store_true', help='View the initial configuration of the system')
@@ -542,6 +614,8 @@ if __name__ == "__main__":
         abp.Trajectory(pos, orient)
     if args.MSD:
         abp.MSD(pos)
+    if args.variance:
+        abp.Variance(pos)
     if args.FPTD:
         abp.FPTD(pos, args.x)
     if args.PDF:
