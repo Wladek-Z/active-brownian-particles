@@ -19,11 +19,12 @@ def phase_diagram(filename):
         filename: file to stored data
     """
     # Read in and interpret data
-    lp_w, Pf_Ps, a, trap_frac, mean_vx = np.loadtxt(filename, delimiter=',', skiprows=1, unpack=True)
+    lp_w, Pf_Ps, a, b, trap_frac, mean_vx = np.loadtxt(filename, delimiter=',', skiprows=1, unpack=True)
     nlp_w, nPf_Ps = np.unique(lp_w), np.unique(Pf_Ps)
     size_x = len(nlp_w)
     size_y = len(nPf_Ps)
     A = a.reshape(size_x, size_y).T
+    B = b.reshape(size_x, size_y).T
     TF = trap_frac.reshape(size_x, size_y).T
     VX = mean_vx.reshape(size_x, size_y).T
     X, Y = np.meshgrid(nlp_w, nPf_Ps)
@@ -35,11 +36,11 @@ def phase_diagram(filename):
 
     # Plot MSD scaling exponent
     fig = plt.figure(figsize=[8, 6])
-    plt.title("ABP channel phase diagram")
+    plt.title("MSD$_x$ scaling exponent")
     plt.pcolormesh(X, Y, A, cmap=cmap, shading='auto')
-    cbar = plt.colorbar(label=r'MSD scaling exoponent, $\alpha$', boundaries=boundaries, spacing='proportional')
-    cbar.set_ticks([1.2, 1.8])
-    cbar.set_ticklabels([1.2, 1.8])
+    cbar = plt.colorbar(label=r'$\alpha$', boundaries=boundaries, spacing='proportional')
+    cbar.set_ticks([1, 1.2, 1.8, 2])
+    cbar.set_ticklabels([1, 1.2, 1.8, 2])
     plt.xlabel("$l_p/w$")
     plt.ylabel("$Pe_f/Pe_s$")
 
@@ -48,7 +49,7 @@ def phase_diagram(filename):
 
     # Plot mean longitudinal velocity
     fig = plt.figure(figsize=[8, 6])
-    plt.title("ABP channel phase diagram")
+    plt.title("Mean longitudinal velocity")
     plt.pcolormesh(X, Y, VX, cmap='bwr', shading='auto', norm=norm_vx)
     plt.colorbar(label=r'$\langle v_x \rangle/wD_r$')
     plt.xlabel("$l_p/w$")
@@ -56,9 +57,19 @@ def phase_diagram(filename):
 
     # Plot trapping fraction    
     fig = plt.figure(figsize=[8, 6])
-    plt.title("ABP channel phase diagram")
+    plt.title("% time spent swimming upstream at the surface")
     plt.pcolormesh(X, Y, TF, cmap='viridis', shading='auto')
     plt.colorbar(label='trapping fraction')
+    plt.xlabel("$l_p/w$")
+    plt.ylabel("$Pe_f/Pe_s$")
+
+    # Plot variance of displacement
+    fig = plt.figure(figsize=[8, 6])
+    plt.title(r"Var($\Delta x$) scaling exponent")
+    plt.pcolormesh(X, Y, B, cmap=cmap, shading='auto')
+    cbar = plt.colorbar(label=r'$\beta$', boundaries=boundaries, spacing='proportional')
+    cbar.set_ticks([1, 1.2, 1.8, 2])
+    cbar.set_ticklabels([1, 1.2, 1.8, 2])
     plt.xlabel("$l_p/w$")
     plt.ylabel("$Pe_f/Pe_s$")
 
@@ -74,46 +85,27 @@ def pd_comparison(filename1, filename2):
         filename2: filepath to dataset without shear
     """
     # Read in and interpret data (1)
-    lp_w1, Pf_Ps1, a1, trap_frac1, mean_vx1 = np.loadtxt(filename1, delimiter=',', skiprows=1, unpack=True)
+    lp_w1, Pf_Ps1, a1, b1, trap_frac1, mean_vx1 = np.loadtxt(filename1, delimiter=',', skiprows=1, unpack=True)
     nlp_w1, nPf_Ps1 = np.unique(lp_w1), np.unique(Pf_Ps1)
     size_x1 = len(nlp_w1)
     size_y1 = len(nPf_Ps1)
     A1 = a1.reshape(size_x1, size_y1).T
+    B1 = b1.reshape(size_x1, size_y1).T
     TF1 = trap_frac1.reshape(size_x1, size_y1).T
     VX1 = mean_vx1.reshape(size_x1, size_y1).T
     X1, Y1 = np.meshgrid(nlp_w1, nPf_Ps1)
 
     # Read in and interpret data (2)
-    lp_w2, Pf_Ps2, a2, trap_frac2, mean_vx2 = np.loadtxt(filename2, delimiter=',', skiprows=1, unpack=True)
+    lp_w2, Pf_Ps2, a2, b2, trap_frac2, mean_vx2 = np.loadtxt(filename2, delimiter=',', skiprows=1, unpack=True)
     nlp_w2, nPf_Ps2 = np.unique(lp_w2), np.unique(Pf_Ps2)
     size_x2 = len(nlp_w2)
     size_y2 = len(nPf_Ps2)
     A2 = a2.reshape(size_x2, size_y2).T
+    B2 = b2.reshape(size_x2, size_y2).T
     TF2 = trap_frac2.reshape(size_x2, size_y2).T
     VX2 = mean_vx2.reshape(size_x2, size_y2).T
     X2, Y2 = np.meshgrid(nlp_w2, nPf_Ps2)
 
-    # Define function for plotting phase diagram comparison
-    def plot_comparison_figure(label, data1, data2, cmap):
-        vmin = min(np.nanmin(data1), np.nanmin(data2))
-        vmax = max(np.nanmax(data1), np.nanmax(data2))
-        
-        fig, axes = plt.subplots(1, 2, figsize=[14, 6], constrained_layout=True, sharey=True)
-
-        mesh1 = axes[0].pcolormesh(X1, Y1, data1, cmap=cmap, shading='auto', vmin=vmin, vmax=vmax)
-        axes[0].set_title('Shear effects')
-        axes[0].set_xlabel("$l_p/w$")
-        axes[0].set_ylabel("$Pe_f/Pe_s$")
-
-        mesh2 = axes[1].pcolormesh(X2, Y2, data2, cmap=cmap, shading='auto', vmin=vmin, vmax=vmax)
-        axes[1].set_title('No shear effects')
-        axes[1].set_xlabel("$l_p/w$")
-        axes[1].set_ylabel("$Pe_f/Pe_s$")
-
-        fig.suptitle("ABP Channel Phase Diagram Comparison")
-        fig.colorbar(mesh2, ax=axes, location='right', label=label)
-        return fig
-    
     # Define custom colormap
     colours = ['blue', 'white', 'red']
     cmap = colors.ListedColormap(colours)
@@ -129,9 +121,23 @@ def pd_comparison(filename1, filename2):
     axes[1].set_title('no shear effects')
     axes[1].set_xlabel("$l_p/w$")
     fig.suptitle("ABP channel phase diagram comparison")
-    cbar = fig.colorbar(mesh2, ax=axes, location='right', label=r"MSD scaling exponent, $\alpha$", boundaries=boundaries, spacing='proportional')
-    cbar.set_ticks([1.2, 1.8])
-    cbar.set_ticklabels([1.2, 1.8])
+    cbar = fig.colorbar(mesh2, ax=axes, location='right', label=r"$\alpha$", boundaries=boundaries, spacing='proportional')
+    cbar.set_ticks([1, 1.2, 1.8, 2])
+    cbar.set_ticklabels([1, 1.2, 1.8, 2])
+
+    # Plot comparison of variance scaling exponents
+    fig, axes = plt.subplots(1, 2, figsize=[14, 6], constrained_layout=True, sharey=True)
+    mesh1 = axes[0].pcolormesh(X1, Y1, B1, cmap=cmap, shading='auto')
+    axes[0].set_title('shear effects')
+    axes[0].set_xlabel("$l_p/w$")
+    axes[0].set_ylabel("$Pe_f/Pe_s$")
+    mesh2 = axes[1].pcolormesh(X2, Y2, B2, cmap=cmap, shading='auto')
+    axes[1].set_title('no shear effects')
+    axes[1].set_xlabel("$l_p/w$")
+    fig.suptitle("ABP channel phase diagram comparison")
+    cbar = fig.colorbar(mesh2, ax=axes, location='right', label=r"$\beta$", boundaries=boundaries, spacing='proportional')
+    cbar.set_ticks([1, 1.2, 1.8, 2])
+    cbar.set_ticklabels([1, 1.2, 1.8, 2])
 
     # Normalise divergent colormap
     vmin = min(np.nanmin(VX1), np.nanmin(VX2))
@@ -165,6 +171,119 @@ def pd_comparison(filename1, filename2):
     fig.colorbar(mesh2, ax=axes, location='right', label='trapping fraction')
 
     plt.show()
+
+def pd3_comparison(filename1, filename2, filename3):
+    """
+    Plot side-by-side phase diagram comparisons for three datasets.
+    
+    Arguments:
+        filename1: filepath to dataset with shear
+        filename2: filepath to dataset without shear
+        filename3: filepath to dataset without shear or vorticity
+    """
+    # Read in and interpret data (1)
+    lp_w1, Pf_Ps1, a1, b1, trap_frac1, mean_vx1 = np.loadtxt(filename1, delimiter=',', skiprows=1, unpack=True)
+    nlp_w1, nPf_Ps1 = np.unique(lp_w1), np.unique(Pf_Ps1)
+    size_x1 = len(nlp_w1)
+    size_y1 = len(nPf_Ps1)
+    A1 = a1.reshape(size_x1, size_y1).T
+    B1 = b1.reshape(size_x1, size_y1).T
+    TF1 = trap_frac1.reshape(size_x1, size_y1).T
+    VX1 = mean_vx1.reshape(size_x1, size_y1).T
+    X1, Y1 = np.meshgrid(nlp_w1, nPf_Ps1)
+
+    # Read in and interpret data (2)
+    lp_w2, Pf_Ps2, a2, b2, trap_frac2, mean_vx2 = np.loadtxt(filename2, delimiter=',', skiprows=1, unpack=True)
+    nlp_w2, nPf_Ps2 = np.unique(lp_w2), np.unique(Pf_Ps2)
+    size_x2 = len(nlp_w2)
+    size_y2 = len(nPf_Ps2)
+    A2 = a2.reshape(size_x2, size_y2).T
+    B2 = b2.reshape(size_x2, size_y2).T
+    TF2 = trap_frac2.reshape(size_x2, size_y2).T
+    VX2 = mean_vx2.reshape(size_x2, size_y2).T
+    X2, Y2 = np.meshgrid(nlp_w2, nPf_Ps2)
+
+    # Read in and interpret data (2)
+    lp_w3, Pf_Ps3, a3, b3, trap_frac3, mean_vx3 = np.loadtxt(filename3, delimiter=',', skiprows=1, unpack=True)
+    nlp_w3, nPf_Ps3= np.unique(lp_w3), np.unique(Pf_Ps3)
+    size_x3 = len(nlp_w3)
+    size_y3 = len(nPf_Ps3)
+    A3 = a3.reshape(size_x3, size_y3).T
+    B3 = b3.reshape(size_x3, size_y3).T
+    TF3 = trap_frac2.reshape(size_x3, size_y3).T
+    VX3 = mean_vx3.reshape(size_x3, size_y3).T
+    X3, Y3 = np.meshgrid(nlp_w3, nPf_Ps3)
+
+    # Define custom colormap
+    colours = ['blue', 'white', 'red']
+    cmap = colors.ListedColormap(colours)
+    boundaries = np.array([1, 1.2, 1.8, 2])
+
+    # Define function for plotting MSD/variance scaling exponents
+    def scaling_plot(data1, data2, data3, title, label):
+        fig, axes = plt.subplots(1, 3, figsize=[20, 6], constrained_layout=True, sharey=True)
+        mesh1 = axes[0].pcolormesh(X1, Y1, data1, cmap=cmap, shading='auto')
+        axes[0].set_title('vorticity, shear')
+        axes[0].set_xlabel("$l_p/w$")
+        axes[0].set_ylabel("$Pe_f/Pe_s$")
+        mesh2 = axes[1].pcolormesh(X2, Y2, data2, cmap=cmap, shading='auto')
+        axes[1].set_title('vorticity, no shear')
+        axes[1].set_xlabel("$l_p/w$")
+        mesh3 = axes[2].pcolormesh(X3, Y3, data3, cmap=cmap, shading='auto')
+        axes[3].set_title('no vorticity, no shear')
+        axes[3].set_xlabel("$l_p/w$")
+        fig.suptitle(title)
+        cbar = fig.colorbar(mesh3, ax=axes, location='right', label=label, boundaries=boundaries, spacing='proportional')
+        cbar.set_ticks([1, 1.2, 1.8, 2])
+        cbar.set_ticklabels([1, 1.2, 1.8, 2])
+        return fig
+
+    # Plot comparison of MSD scaling exponents
+    scaling_plot(A1, A2, A3, 'MSD$_x$ scaling exponent', r'\alpha')
+    # Plot comparison of variance scaling exponents
+    scaling_plot(B1, B2, B3, r'Var($\Delta x$) scaling exponent', r'\beta')
+
+    # Normalise divergent colormap for <vx>
+    vmin = min(np.nanmin(VX1), np.nanmin(VX2), np.nanmin(VX3))
+    vmax = max(np.nanmax(VX1), np.nanmax(VX2), np.nanmax(VX3))
+    norm_vx = colors.TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)
+
+    # Plot comparison of mean longitudinal velocity    
+    fig, axes = plt.subplots(1, 3, figsize=[20, 6], constrained_layout=True, sharey=True)
+    mesh1 = axes[0].pcolormesh(X1, Y1, VX1, cmap='bwr', shading='auto', norm=norm_vx)
+    axes[0].set_title('vorticity, shear')
+    axes[0].set_xlabel("$l_p/w$")
+    axes[0].set_ylabel("$Pe_f/Pe_s$")
+    mesh2 = axes[1].pcolormesh(X2, Y2, VX2, cmap='bwr', shading='auto', norm=norm_vx)
+    axes[1].set_title('vorticity, no shear')
+    axes[1].set_xlabel("$l_p/w$")
+    mesh3 = axes[2].pcolormesh(X3, Y3, VX3, cmap='bwr', shading='auto', norm=norm_vx)
+    axes[2].set_title('no vorticity, no shear')
+    axes[2].set_xlabel("$l_p/w$")
+    fig.suptitle("Mean longitudinal velocity")
+    fig.colorbar(mesh3, ax=axes, location='right', label=r"$\langle v_x \rangle/wD_r$")
+
+    # Find minimum/maximum values for trapping fraction
+    vmin = min(np.nanmin(TF1), np.nanmin(TF2), np.nanmin(TF3))
+    vmax = max(np.nanmax(TF1), np.nanmax(TF2), np.nanmax(TF3))
+
+    # Plot comparison of trapping fractions
+    fig, axes = plt.subplots(1, 3, figsize=[20, 6], constrained_layout=True, sharey=True)
+    mesh1 = axes[0].pcolormesh(X1, Y1, TF1, cmap='bwr', shading='auto', vmin=vmin, vmax=vmax)
+    axes[0].set_title('vorticity, shear')
+    axes[0].set_xlabel("$l_p/w$")
+    axes[0].set_ylabel("$Pe_f/Pe_s$")
+    mesh2 = axes[1].pcolormesh(X2, Y2, TF2, cmap='bwr', shading='auto', vmin=vmin, vmax=vmax)
+    axes[1].set_title('vorticity, no shear')
+    axes[1].set_xlabel("$l_p/w$")
+    mesh3 = axes[2].pcolormesh(X3, Y3, TF3, cmap='bwr', shading='auto', vmin=vmin, vmax=vmax)
+    axes[2].set_title('no vorticity, no shear')
+    axes[2].set_xlabel("$l_p/w$")
+    fig.suptitle("% time spent swimming upstream at the surface")
+    fig.colorbar(mesh3, ax=axes, location='right', label="trapping fraction")
+    
+    plt.show()
+
 
 def pdx_comparison(filename1):
     """
@@ -267,20 +386,21 @@ def big_histogram(folder):
 if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('-f', type=str, default=None, help='Filepath to dataset for reading/writing')
+    parser.add_argument('-f1', type=str, default=None, help='Filepath to first dataset')
     parser.add_argument('-f2', type=str, default=None, help='Filepath to second dataset, if applicable')
+    parser.add_argument('-f2', type=str, default=None, help='Filepath to third dataset, if applicable')
     parser.add_argument('--PD', action='store_true', help='Construct the phase diagram')
-    parser.add_argument('--PD2', action='store_true', help='Compare the phase diagrams of systems with/without shear')
-    parser.add_argument('--PDX', action='store_true', help='Compare the phase diagrams of alpha for total displacement and longitudinal displacement')
+    parser.add_argument('--PD3', action='store_true', help='Compare the phase diagrams of systems with/without shear, vorticity')
+    parser.add_argument('--PDX', action='store_true', help='Compare the phase diagrams of alpha for total and longitudinal displacement')
     parser.add_argument('-F', type=str, default=None, help='Folder containing data files')
     parser.add_argument('--hist', action='store_true', help='Construct histograms from saved data')
     args = parser.parse_args()
 
     if args.PD:
-        phase_diagram(args.f)
-    if args.PD2:
-        pd_comparison(args.f, args.f2)
+        phase_diagram(args.f1)
+    if args.PD3:
+        pd3_comparison(args.f1, args.f2, args.f3)
     if args.PDX:
-        pdx_comparison(args.f)
+        pdx_comparison(args.f1)
     if args.hist:
         big_histogram(args.F)

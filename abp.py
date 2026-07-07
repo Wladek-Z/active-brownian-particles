@@ -11,7 +11,7 @@ plt.rcParams['text.usetex'] = False
 
 # Developer tools ;)
 d = 2
-flow = 1
+vorticity = 1
 noise_t = 1
 noise_r = 1
 use_arrows = False
@@ -117,7 +117,7 @@ def orientation(e, dt, Pf, y, G):
     # Calculate angle from x-axis of the original orientation vector
     theta = np.arctan2(e[1], e[0])
     # Calculate angular velocity due to vorticity and shear
-    d_theta_omega = 2 * dt * Pf * (1 - 2 * y) * (G * np.cos(2 * theta) - flow)
+    d_theta_omega = 2 * dt * Pf * (1 - 2 * y) * (G * np.cos(2 * theta) - vorticity)
     # Calculate new angle
     new_theta = theta + d_theta_noise + d_theta_omega
     # Return updated orientation vector
