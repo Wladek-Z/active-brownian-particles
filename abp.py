@@ -543,9 +543,9 @@ class ABP:
 
         fig = plt.figure(figsize=[8, 6])
         plt.stairs(pdf1, edges1, color='black')
-        plt.title(f"Spatial distribution: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
-        plt.xlabel("height along channel, $y/w$")
-        plt.ylabel("probability density, $P(y/w)$")
+        plt.title(f"Spatial PDF: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
+        plt.xlabel("$y/w$")
+        plt.ylabel("$P(y/w)$")
         plt.xlim(0, 1)
 
         # Isolate orientation angles from orientation data
@@ -556,9 +556,9 @@ class ABP:
 
         fig = plt.figure(figsize=[8, 6])
         plt.stairs(pdf2, edges2, color='black')
-        plt.title(f"Orientational distribution: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
-        plt.xlabel(r"orientation angle, $\theta$")
-        plt.ylabel(r"probability density, $P(\theta)$")
+        plt.title(f"Orientational PDF: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
+        plt.xlabel(r"$\theta$")
+        plt.ylabel(r"$P(\theta)$")
         plt.xlim(-np.pi, np.pi)
         plt.xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
 
@@ -573,9 +573,9 @@ class ABP:
 
         fig = plt.figure(figsize=[8, 6])
         plt.stairs(pdf3, edges3, color='black')
-        plt.title(f"Orientational distribution (trapped): $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
-        plt.xlabel(r"orientation angle, $\theta$")
-        plt.ylabel(r"probability density, $P(\theta)$")
+        plt.title(f"Orientational PDF (trapped): $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
+        plt.xlabel(r"$\theta$")
+        plt.ylabel(r"$P(\theta)$")
         plt.xlim(-np.pi, np.pi)
         plt.xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
 

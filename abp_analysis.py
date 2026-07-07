@@ -32,15 +32,17 @@ def phase_diagram(filename):
     # Define custom colormap
     colours = ['blue', 'white', 'red']
     cmap = colors.ListedColormap(colours)
-    boundaries = np.array([1, 1.2, 1.8, 2])
+    vmin = np.min(A)
+    vmax = np.max(A)
+    boundaries = np.array([vmin, 1.2, 1.8, vmax])
 
     # Plot MSD scaling exponent
     fig = plt.figure(figsize=[8, 6])
     plt.title("MSD$_x$ scaling exponent")
     plt.pcolormesh(X, Y, A, cmap=cmap, shading='auto')
     cbar = plt.colorbar(label=r'$\alpha$', boundaries=boundaries, spacing='proportional')
-    cbar.set_ticks([1, 1.2, 1.8, 2])
-    cbar.set_ticklabels([1, 1.2, 1.8, 2])
+    cbar.set_ticks(boundaries)
+    cbar.set_ticklabels(boundaries)
     plt.xlabel("$l_p/w$")
     plt.ylabel("$Pe_f/Pe_s$")
 
@@ -214,14 +216,18 @@ def pd3_comparison(filename1, filename2, filename3):
     VX3 = mean_vx3.reshape(size_x3, size_y3).T
     X3, Y3 = np.meshgrid(nlp_w3, nPf_Ps3)
 
+    # Find minimum/maximum values for alpha
+    vmin = np.round(min(np.nanmin(A1), np.nanmin(A2), np.nanmin(A3)), 2)
+    vmax = np.round(max(np.nanmax(A1), np.nanmax(A2), np.nanmax(A3)), 2)
+
     # Define custom colormap
     colours = ['blue', 'white', 'red']
     cmap = colors.ListedColormap(colours)
-    boundaries = np.array([1, 1.2, 1.8, 2])
+    boundaries = np.array([vmin, 1.2, 1.8, vmax])
 
     # Define function for plotting MSD/variance scaling exponents
     def scaling_plot(data1, data2, data3, title, label):
-        fig, axes = plt.subplots(1, 3, figsize=[20, 6], constrained_layout=True, sharey=True)
+        fig, axes = plt.subplots(1, 3, figsize=[21, 5], constrained_layout=True, sharey=True)
         mesh1 = axes[0].pcolormesh(X1, Y1, data1, cmap=cmap, shading='auto')
         axes[0].set_title('vorticity, shear')
         axes[0].set_xlabel("$l_p/w$")
@@ -230,18 +236,36 @@ def pd3_comparison(filename1, filename2, filename3):
         axes[1].set_title('vorticity, no shear')
         axes[1].set_xlabel("$l_p/w$")
         mesh3 = axes[2].pcolormesh(X3, Y3, data3, cmap=cmap, shading='auto')
-        axes[3].set_title('no vorticity, no shear')
-        axes[3].set_xlabel("$l_p/w$")
+        axes[2].set_title('no vorticity, no shear')
+        axes[2].set_xlabel("$l_p/w$")
         fig.suptitle(title)
         cbar = fig.colorbar(mesh3, ax=axes, location='right', label=label, boundaries=boundaries, spacing='proportional')
-        cbar.set_ticks([1, 1.2, 1.8, 2])
-        cbar.set_ticklabels([1, 1.2, 1.8, 2])
+        cbar.set_ticks(boundaries)
+        cbar.set_ticklabels(boundaries)
         return fig
-
+    
     # Plot comparison of MSD scaling exponents
-    scaling_plot(A1, A2, A3, 'MSD$_x$ scaling exponent', r'\alpha')
-    # Plot comparison of variance scaling exponents
-    scaling_plot(B1, B2, B3, r'Var($\Delta x$) scaling exponent', r'\beta')
+    scaling_plot(A1, A2, A3, 'MSD$_x$ scaling exponent', r'$\alpha$')
+    
+    # Normalise divergent colormap for variance
+    vmin = min(np.nanmin(B1), np.nanmin(B2), np.nanmin(B3))
+    vmax = max(np.nanmax(B1), np.nanmax(B2), np.nanmax(B3))
+    norm_vx = colors.TwoSlopeNorm(vmin=vmin, vcenter=1, vmax=vmax)
+
+    # Plot comparison of variance scaling exponents    
+    fig, axes = plt.subplots(1, 3, figsize=[21, 5], constrained_layout=True, sharey=True)
+    mesh1 = axes[0].pcolormesh(X1, Y1, B1, cmap='bwr', shading='auto', norm=norm_vx)
+    axes[0].set_title('vorticity, shear')
+    axes[0].set_xlabel("$l_p/w$")
+    axes[0].set_ylabel("$Pe_f/Pe_s$")
+    mesh2 = axes[1].pcolormesh(X2, Y2, B2, cmap='bwr', shading='auto', norm=norm_vx)
+    axes[1].set_title('vorticity, no shear')
+    axes[1].set_xlabel("$l_p/w$")
+    mesh3 = axes[2].pcolormesh(X3, Y3, B3, cmap='bwr', shading='auto', norm=norm_vx)
+    axes[2].set_title('no vorticity, no shear')
+    axes[2].set_xlabel("$l_p/w$")
+    fig.suptitle(r'Var($\Delta x$) scaling exponent')
+    fig.colorbar(mesh3, ax=axes, location='right', label=r'$\beta$')
 
     # Normalise divergent colormap for <vx>
     vmin = min(np.nanmin(VX1), np.nanmin(VX2), np.nanmin(VX3))
@@ -249,7 +273,7 @@ def pd3_comparison(filename1, filename2, filename3):
     norm_vx = colors.TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)
 
     # Plot comparison of mean longitudinal velocity    
-    fig, axes = plt.subplots(1, 3, figsize=[20, 6], constrained_layout=True, sharey=True)
+    fig, axes = plt.subplots(1, 3, figsize=[21, 5], constrained_layout=True, sharey=True)
     mesh1 = axes[0].pcolormesh(X1, Y1, VX1, cmap='bwr', shading='auto', norm=norm_vx)
     axes[0].set_title('vorticity, shear')
     axes[0].set_xlabel("$l_p/w$")
@@ -268,15 +292,15 @@ def pd3_comparison(filename1, filename2, filename3):
     vmax = max(np.nanmax(TF1), np.nanmax(TF2), np.nanmax(TF3))
 
     # Plot comparison of trapping fractions
-    fig, axes = plt.subplots(1, 3, figsize=[20, 6], constrained_layout=True, sharey=True)
-    mesh1 = axes[0].pcolormesh(X1, Y1, TF1, cmap='bwr', shading='auto', vmin=vmin, vmax=vmax)
+    fig, axes = plt.subplots(1, 3, figsize=[21, 5], constrained_layout=True, sharey=True)
+    mesh1 = axes[0].pcolormesh(X1, Y1, TF1, cmap='autumn', shading='auto', vmin=vmin, vmax=vmax)
     axes[0].set_title('vorticity, shear')
     axes[0].set_xlabel("$l_p/w$")
     axes[0].set_ylabel("$Pe_f/Pe_s$")
-    mesh2 = axes[1].pcolormesh(X2, Y2, TF2, cmap='bwr', shading='auto', vmin=vmin, vmax=vmax)
+    mesh2 = axes[1].pcolormesh(X2, Y2, TF2, cmap='autumn', shading='auto', vmin=vmin, vmax=vmax)
     axes[1].set_title('vorticity, no shear')
     axes[1].set_xlabel("$l_p/w$")
-    mesh3 = axes[2].pcolormesh(X3, Y3, TF3, cmap='bwr', shading='auto', vmin=vmin, vmax=vmax)
+    mesh3 = axes[2].pcolormesh(X3, Y3, TF3, cmap='autumn', shading='auto', vmin=vmin, vmax=vmax)
     axes[2].set_title('no vorticity, no shear')
     axes[2].set_xlabel("$l_p/w$")
     fig.suptitle("% time spent swimming upstream at the surface")
@@ -388,7 +412,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-f1', type=str, default=None, help='Filepath to first dataset')
     parser.add_argument('-f2', type=str, default=None, help='Filepath to second dataset, if applicable')
-    parser.add_argument('-f2', type=str, default=None, help='Filepath to third dataset, if applicable')
+    parser.add_argument('-f3', type=str, default=None, help='Filepath to third dataset, if applicable')
     parser.add_argument('--PD', action='store_true', help='Construct the phase diagram')
     parser.add_argument('--PD3', action='store_true', help='Compare the phase diagrams of systems with/without shear, vorticity')
     parser.add_argument('--PDX', action='store_true', help='Compare the phase diagrams of alpha for total and longitudinal displacement')
