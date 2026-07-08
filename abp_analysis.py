@@ -34,7 +34,7 @@ def phase_diagram(filename):
     cmap = colors.ListedColormap(colours)
     vmin = np.min(A)
     vmax = np.max(A)
-    boundaries = np.array([vmin, 1.2, 1.8, vmax])
+    boundaries = np.array([np.round(vmin, 2), 1.2, 1.8, np.round(vmax, 2)])
 
     # Plot MSD scaling exponent
     fig = plt.figure(figsize=[8, 6])
@@ -57,21 +57,14 @@ def phase_diagram(filename):
     plt.xlabel("$l_p/w$")
     plt.ylabel("$Pe_f/Pe_s$")
 
-    # Plot trapping fraction    
-    fig = plt.figure(figsize=[8, 6])
-    plt.title("% time spent swimming upstream at the surface")
-    plt.pcolormesh(X, Y, TF, cmap='viridis', shading='auto')
-    plt.colorbar(label='trapping fraction')
-    plt.xlabel("$l_p/w$")
-    plt.ylabel("$Pe_f/Pe_s$")
+    # Normalise divergent colormap for variance
+    norm_var = colors.TwoSlopeNorm(vmin=np.nanmin(B), vcenter=1, vmax=np.nanmax(B))
 
     # Plot variance of displacement
     fig = plt.figure(figsize=[8, 6])
     plt.title(r"Var($\Delta x$) scaling exponent")
-    plt.pcolormesh(X, Y, B, cmap=cmap, shading='auto')
-    cbar = plt.colorbar(label=r'$\beta$', boundaries=boundaries, spacing='proportional')
-    cbar.set_ticks([1, 1.2, 1.8, 2])
-    cbar.set_ticklabels([1, 1.2, 1.8, 2])
+    plt.pcolormesh(X, Y, B, cmap='bwr', shading='auto', norm=norm_var)
+    cbar = plt.colorbar(label=r'$\beta$', spacing='proportional')
     plt.xlabel("$l_p/w$")
     plt.ylabel("$Pe_f/Pe_s$")
 
@@ -212,7 +205,7 @@ def pd3_comparison(filename1, filename2, filename3):
     size_y3 = len(nPf_Ps3)
     A3 = a3.reshape(size_x3, size_y3).T
     B3 = b3.reshape(size_x3, size_y3).T
-    TF3 = trap_frac2.reshape(size_x3, size_y3).T
+    TF3 = trap_frac3.reshape(size_x3, size_y3).T
     VX3 = mean_vx3.reshape(size_x3, size_y3).T
     X3, Y3 = np.meshgrid(nlp_w3, nPf_Ps3)
 
@@ -250,18 +243,18 @@ def pd3_comparison(filename1, filename2, filename3):
     # Normalise divergent colormap for variance
     vmin = min(np.nanmin(B1), np.nanmin(B2), np.nanmin(B3))
     vmax = max(np.nanmax(B1), np.nanmax(B2), np.nanmax(B3))
-    norm_vx = colors.TwoSlopeNorm(vmin=vmin, vcenter=1, vmax=vmax)
+    norm_var = colors.TwoSlopeNorm(vmin=vmin, vcenter=1, vmax=vmax)
 
     # Plot comparison of variance scaling exponents    
     fig, axes = plt.subplots(1, 3, figsize=[21, 5], constrained_layout=True, sharey=True)
-    mesh1 = axes[0].pcolormesh(X1, Y1, B1, cmap='bwr', shading='auto', norm=norm_vx)
+    mesh1 = axes[0].pcolormesh(X1, Y1, B1, cmap='bwr', shading='auto', norm=norm_var)
     axes[0].set_title('vorticity, shear')
     axes[0].set_xlabel("$l_p/w$")
     axes[0].set_ylabel("$Pe_f/Pe_s$")
-    mesh2 = axes[1].pcolormesh(X2, Y2, B2, cmap='bwr', shading='auto', norm=norm_vx)
+    mesh2 = axes[1].pcolormesh(X2, Y2, B2, cmap='bwr', shading='auto', norm=norm_var)
     axes[1].set_title('vorticity, no shear')
     axes[1].set_xlabel("$l_p/w$")
-    mesh3 = axes[2].pcolormesh(X3, Y3, B3, cmap='bwr', shading='auto', norm=norm_vx)
+    mesh3 = axes[2].pcolormesh(X3, Y3, B3, cmap='bwr', shading='auto', norm=norm_var)
     axes[2].set_title('no vorticity, no shear')
     axes[2].set_xlabel("$l_p/w$")
     fig.suptitle(r'Var($\Delta x$) scaling exponent')

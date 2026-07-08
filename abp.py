@@ -69,7 +69,7 @@ def update(N, p, e, dt, Ps, D, Pf, G):
             e: particle orientations
             dt: timestep
             Ps: swim Peclet number
-            D: diffusion number
+            D: effective diffusivity
             Pf: flow Peclet number
             G: elongation factor
 
