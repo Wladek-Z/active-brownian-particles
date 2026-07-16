@@ -795,6 +795,8 @@ if __name__ == "__main__":
 
     if args.FPTD:
         fptd_start = True
+    else:
+        fptd_start = False
 
     abp = ABP(args.N, args.T, args.dt, args.Ps, args.D, args.Pf, args.G)
 
