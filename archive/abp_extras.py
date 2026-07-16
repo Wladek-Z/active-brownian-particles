@@ -130,6 +130,93 @@ def run(N, r, e, v, dt, T, d):
                 pos_O[i, j, k] = e[j, k]
     return pos_H, pos_O    
 
+@njit
+def track_traps1(y, dt):
+    """
+    Calculate trapping times within a single ABP trajectory.
+    
+    Arguments:
+        y: single particle transverse trajectory
+        dt: timestep
+    
+    Returns:
+        idx_start: the indexes where the ABP enters the trapped state
+        idx_end: the indexes where the ABP leaves the trapped state
+        trap_times: the trapping times in a single trajectory
+    """
+    bottom = 0.05
+    top = 0.95
+    idx_start = np.full(len(y), False)
+    idx_end = np.full(len(y), False)
+    waittime = int(tau / 5 / dt)
+    timer_trap = 0
+    timer_out = 0
+    trap_times = []
+
+    for i in range(1, len(y)):
+        if y[i] == y[i-1] and timer_trap == 0:
+            idx_start[i] = True
+            timer_trap += 1
+        elif timer_trap > 0 and (y[i] < bottom or y[i] > top):
+            timer_trap += 1
+            timer_out = 0
+        elif timer_trap > 0 and (y[i] >= bottom or y[i] <= top):
+            timer_trap += 1
+            timer_out += 1
+        if timer_out == waittime:
+            trap_times.append((timer_trap - waittime) * dt)
+            idx_end[i - waittime] = True
+            timer_trap = 0
+            timer_out = 0
+
+    return idx_start, idx_end, trap_times
+
+@njit
+def track_traps2(y, dt):
+    """
+    Calculate trapping times within a single ABP trajectory using an alternative method.
+    
+    Arguments:
+        y: single particle transverse trajectory
+        dt: timestep
+    
+    Returns:
+        idx_start: the indexes where the ABP enters the trapped state
+        idx_end: the indexes where the ABP leaves the trapped state
+        trap_times: the trapping times in a single trajectory
+    """
+    bottom = 0.05
+    top = 0.95
+    idx_start = np.full(len(y), False)
+    idx_end = np.full(len(y), False)
+    timer_trap = 0
+    waittime = int(tau / 10 / dt)
+    timer_in = 0
+    timer_out = 0
+    trap_times = []
+
+    for i in range(1, len(y)):
+        if (y[i] < bottom or y[i] > top) and timer_trap == 0:
+            timer_in += 1
+        elif (y[i] >= bottom or y[i] <= top) and timer_in > 0:
+            timer_in = 0
+        elif (y[i] < bottom or y[i] > top) and timer_trap > 0:
+            timer_trap += 1
+            timer_out = 0
+        elif (y[i] >= bottom or y[i] <= top) and timer_trap > 0:
+            timer_trap += 1
+            timer_out += 1
+        if timer_in == waittime:
+            idx_start[i - waittime] = True
+            timer_trap += waittime
+            timer_in = 0
+        elif timer_out == waittime:
+            idx_end[i - waittime] = True
+            trap_times.append((timer_trap - waittime) * dt)
+            timer_trap = 0
+            timer_out = 0
+
+    return idx_start, idx_end, trap_times
 
 class ABP:
     """

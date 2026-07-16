@@ -32,31 +32,27 @@ def phase_diagram(filename, N, T, dt, D, l1, u1, l2, u2, n, G):
     Pf_Ps_list = np.round(np.linspace(l2, u2, n), 3)
 
     with open(filename, 'w') as f:
-        f.write("lp_w,Pf_Ps,alpha,beta,trap_frac,mean_vx\n")
+        f.write(f"# G = {G}\n")
+        f.write("lp_w,Pf_Ps,alpha,beta,mean_vx\n")
 
         for Ps in lp_w_list:
             for Pf_Ps in Pf_Ps_list:
                 Pf = Pf_Ps * Ps
                 abp = ABP(N, T, dt, Ps, D, Pf, G)
                 pos, _ = abp.Run()
-                # Decorrelate the position data
-                p = pos[::abp.step][10:-1]
                 # Get MSD scaling exponent
                 msd_xy, msd = abp.get_MSD(pos)
-                a, _ = abp.get_powerlaw(msd_xy[:, 0])
+                a, _ = abp.get_MSD_powerlaw(msd_xy[:, 0])
                 # Get mean x-velocity
                 vx = abp.get_xspeed(pos)
                 vx_independent = vx[::abp.step][10:]
                 mean_vx = np.mean(vx_independent)
-                # Get fraction of time spent in the 'trapped' state
-                trap = abp.trapping_index(p, vx_independent)
-                trap_frac = np.count_nonzero(trap) / np.size(trap)
                 # Get variance scaling exponent
                 var_x = abp.get_variance(pos[:, :, 0])
                 b, _ = abp.get_powerlaw(var_x)
                 # Track progress
-                print(f"Ps = {Ps}, Pf = {Pf}, alpha = {a}, beta = {b}, trapping fraction = {trap_frac}, mean x-velocity = {mean_vx}")
-                f.write(f"{Ps},{Pf_Ps},{a},{b},{trap_frac},{mean_vx}\n")
+                print(f"Ps = {Ps}, Pf = {Pf}, alpha = {a}, beta = {b}, mean x-velocity = {mean_vx}")
+                f.write(f"{Ps},{Pf_Ps},{a},{b},{mean_vx}\n")
 
 def phase_diagram_x(filename, N, T, dt, D, l1, u1, l2, u2, n, G):
     """

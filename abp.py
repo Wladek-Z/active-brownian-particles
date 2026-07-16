@@ -3,6 +3,8 @@ from numba import njit
 import matplotlib.pyplot as plt
 import scienceplots
 from scipy.stats import uniform_direction
+from scipy.stats import binned_statistic
+from scipy.optimize import curve_fit
 import argparse
 import random
 
@@ -11,11 +13,12 @@ plt.rcParams['text.usetex'] = False
 
 # Developer tools ;)
 d = 2
+tau = 1 / (d - 1)
 vorticity = 1
-noise_t = 1
 noise_r = 1
 use_arrows = False
 centre_start = False
+show_traps = False
 
 @njit
 def run(N, p, e, T, dt, Ps, D, Pf, G):
@@ -84,7 +87,7 @@ def update(N, p, e, dt, Ps, D, Pf, G):
             # Compute swim velocity term
             p_swim = dt * Ps * e[i] 
             # Generate translational noise term
-            p_noise = noise_t * np.sqrt(2 * dt) * D * np.random.normal(0, 1, 2) 
+            p_noise = np.sqrt(2 * dt) * D * np.random.normal(0, 1, 2) 
             # Update position via forward difference scheme
             p_new[i] = p[i] + p_swim + p_noise
             # Incorporate correction due to fluid flow
@@ -134,10 +137,10 @@ def positions(N):
     Returns:
         r: positions of each particle
     """
-    x_min = 0
-    x_max = 0.5
-    y_min = 0
-    y_max = 1
+    x_min = -0.25
+    x_max = 0.25
+    y_min = 0.25
+    y_max = 0.75
     # Initialise positions
     r = np.zeros((N, 2))
     # Randomly choose x and y components within specified range
@@ -147,13 +150,86 @@ def positions(N):
     # Return position array
     return r
 
+@njit
+def trapping_times(y, orient, N, dt):
+    """
+    Get array of trapping times.
+    
+    Arguments:
+        y: transverse position history
+        orient: orientation history
+        N: number of particles
+        dt: timestep
+    
+    Returns:
+        trap_times: array of trapping times
+    """
+    # Collect trap durations across all particles
+    trap_times = np.empty(0)
+    # Iterate over each particle
+    for n in range(N):
+        dx, dy = orient[:, n, 0], orient[:, n, 1]
+        theta = np.arctan2(dy, dx)
+        _, _, tt = track_traps(y[:, n], dt, theta)
+        trap_times = np.append(trap_times, tt)
+    # Return trapping times
+    return trap_times
+
+@njit
+def track_traps(y, dt, theta):
+    """
+    Calculate trapping times within a single ABP trajectory.
+    
+    Arguments:
+        y: single particle transverse trajectory
+        dt: timestep
+        theta: single particle orientation history
+    
+    Returns:
+        idx_start: the indexes where the ABP enters the trapped state
+        idx_end: the indexes where the ABP leaves the trapped state
+        trap_times: the trapping times in a single trajectory
+    """
+    bottom = False
+    top = False
+    start = 0
+    idx_start = np.full(len(y), False)
+    idx_end = np.full(len(y), False)
+    timer_trap = 0
+    trap_times = []
+
+    for i in range(1, len(y)):
+        if y[i-1] == y[i] and timer_trap == 0:
+            idx_start[i] = True
+            timer_trap += 1
+            if y[i] < 0.5:
+                bottom = True
+            else:
+                top = True
+        elif timer_trap > 0 and ((bottom and (np.pi/4 < theta[i] < 3*np.pi/4)) or (top and (-3*np.pi/4 < theta[i] < -np.pi/4))):
+            idx_end[i - timer_trap + start] = True
+            trap_times.append(start * dt)
+            timer_trap = 0
+            bottom = False
+            top = False
+            start = 0
+        elif timer_trap > 0 and ((bottom and (0 < theta[i] < np.pi)) or (top and (-np.pi < theta[i] < 0))) and start == 0:
+            start = timer_trap
+            timer_trap += 1
+        elif timer_trap > 0 and ((top and (0 <= theta[i] <= np.pi)) or (bottom and (-np.pi <= theta[i] <= 0))) and start > 0:
+            start = 0
+            timer_trap += 1
+        elif timer_trap > 0:
+            timer_trap += 1
+
+    return idx_start, idx_end, trap_times
 
 class ABP:
     """
-    An ensemble of active Brownian particles submerged in fluid, for a given system geometry (2D).
+    An ensemble of active Brownian particles experiencing Poisseuille flow in a confined geometry.
     """
 
-    def __init__(self, N, T, dt, Ps, D, Pf, G):
+    def __init__(self, N, T, dt, Ps, D, Pf, G, m):
         """
         Initialise N realisations of the same particle at the origin with random orientations.
         
@@ -164,7 +240,8 @@ class ABP:
             Ps: swim Peclet number
             D: diffusion number
             Pf: flow Peclet number
-            G: geometrical elongation factor        
+            G: geometrical elongation factor   
+            m: trapping time method     
         """
         # Initialise variables
         self.N = N
@@ -174,6 +251,7 @@ class ABP:
         self.D = D
         self.Pf = Pf
         self.G = G
+        self.m = m
         self.step = int(1 / dt)
         # Initialise orientation vector of each particle from a uniform rotationally symmetric distribution
         distribution = uniform_direction(2)
@@ -182,6 +260,8 @@ class ABP:
         if centre_start:
             self.r = np.full((N, 2), [0, 0.5])
             self.e = np.full((N, 2), [1/np.sqrt(2), 1/np.sqrt(2)])
+        elif fptd_start:
+            self.r = np.full((N, 2), [0, 0.5])
         else:
             self.r = positions(N)
         
@@ -197,7 +277,6 @@ class ABP:
         # Run simulation and retrieve data
         pos, orient = run(self.N, self.r, self.e, self.T, self.dt, self.Ps, self.D, self.Pf, self.G)
         return pos, orient        
-
 
     def get_MSD(self, data):
         """
@@ -217,12 +296,12 @@ class ABP:
         # Return MSDs
         return msd_xy, msd_tot
     
-    def get_powerlaw(self, data):
+    def get_MSD_powerlaw(self, data):
         """
-        Obtain the late-time power-law dependence of a dataset related to the displacement.
+        Obtain the power-law dependence of an MSD dataset.
         
         Argument:
-            data: data to fit
+            data: dependent data
         
         Returns:
             a: fitted power
@@ -230,8 +309,6 @@ class ABP:
         """
         # Create array of measurement times
         t = np.arange(1, self.T + 1) * self.dt
-        # Calculate persistence time
-        tau = 1 / (d - 1) 
         # Consider only late-time data, i.e. >> tau
         late = t >= 10 * tau
         y = np.log(data[late])
@@ -286,15 +363,13 @@ class ABP:
 
         # Create array of measurement times
         t = np.arange(1, self.T + 1) * self.dt
-        # Calculate persistence time
-        tau = 1 / (d - 1) 
         # Theoretical mean square displacement
         msd_theory = 2 * d * self.D**2 * t + 2 * self.Ps**2 * tau * t - 2 * self.Ps**2 * tau**2 * (1 - np.exp(-t / tau))
         # Theoretical msd for ballistic and diffusive regimes
         msd_b = self.Ps**2 * t**2 + 2 * d * self.D**2 * t
         msd_d = 2 * t * (d * self.D**2 + self.Ps**2 * tau)
         # Perform fit to late-time data
-        a, b = self.get_powerlaw(msd)
+        a, b = self.get_MSD_powerlaw(msd, t)
         t_fit = np.linspace(tau/self.dt, self.T, 100) * self.dt
         msd_fit = np.exp(b) * t_fit**a
         # Calculate MSD at t = 10*tau
@@ -316,7 +391,7 @@ class ABP:
 
         # Calculate MSD in the x-direction and line of best fit fit
         msd_x = msd_xy[:, 0]
-        a_x, b_x = self.get_powerlaw(msd_x)
+        a_x, b_x = self.get_MSD_powerlaw(msd_x)
         msd_x_fit = np.exp(b_x) * t_fit**a_x
         # Calculate MSD at t = 10*tau
         msd_x_fit_10 = np.exp(b_x) * (10*tau)**a_x
@@ -336,7 +411,7 @@ class ABP:
 
         # Calculate MSD in the y-direction and line of best fit fit
         msd_y = msd_xy[:, 1]
-        a_y, b_y = self.get_powerlaw(msd_y)
+        a_y, b_y = self.get_MSD_powerlaw(msd_y)
         msd_y_fit = np.exp(b_y) * t_fit**a_y
         # Calculate MSD at t = 10*tau
         msd_y_fit_10 = np.exp(b_y) * (10*tau)**a_y
@@ -386,8 +461,6 @@ class ABP:
         # Theoretical mean square displacement
         # Perform fit to variance
         a, b = self.get_powerlaw(var)
-        # Calculate persistence time
-        tau = 1 / (d - 1) 
         # Perform fit to late-time data
         t_fit = np.linspace(tau/self.dt, self.T, 100) * self.dt
         var_fit = np.exp(b) * t_fit**a
@@ -417,7 +490,6 @@ class ABP:
         plt.tight_layout()
         plt.show()
 
-
     def Trajectory(self, data, data1):
         """
         Retrieve the positions of an ensemble of particles over time, as well
@@ -434,20 +506,31 @@ class ABP:
         # Consider only first particle
         x, y = data[:, 0, 0], data[:, 0, 1]
         start_x, start_y = data[0, 0, 0], data[0, 0, 1]
-        plt.scatter(start_x, start_y, color='lime', s=20, zorder=1)
         end_x, end_y = data[-1, 0, 0], data[-1, 0, 1]
+
+
+        plt.scatter(start_x, start_y, color='lime', s=20, zorder=1)
         plt.scatter(end_x, end_y, color='red', s=20, zorder=1)
-        plt.scatter(x, y, color='black', marker='.', s=1, zorder=-1)
-        #plt.plot(x, y, color='black', zorder=-1)
+
+        if show_traps:
+            # Calculate orientation angles
+            dx, dy = data1[:, 0, 0], data1[:, 0, 1]
+            theta = np.arctan2(dy, dx)
+            idx_s, idx_e, _ = track_traps(y, self.dt, theta)
+
+            plt.scatter(x[idx_s], y[idx_s], color='cyan', s=15, zorder=1)
+            plt.scatter(x[idx_e], y[idx_e], color='orange', s=15, zorder=1)
+
+        #plt.scatter(x, y, color='black', marker='.', s=1, zorder=-1)
+        plt.plot(x, y, color='black', zorder=-1)
         plt.xlabel(r"$x/w$")
         plt.ylabel(r"$y/w$")
         plt.axhline(0, color='black', linestyle='--', alpha=0.5)
         plt.axhline(1, color='black', linestyle='--', alpha=0.5)
         # Plot early-time orientations along trajectory
         if use_arrows:
-            spacing = min(2000, self.T // 50)
+            spacing = 5 #min(2000, self.T // 50)
             # Create array of arrow directions
-            dx, dy = data1[:, 0, 0], data1[:, 0, 1]
             dx, dy = dx[::spacing], dy[::spacing]
             # Create array of arrow bases
             X, Y = x[::spacing], y[::spacing]
@@ -458,9 +541,7 @@ class ABP:
     
     def FPTD(self, data, target):
         """
-        Obtain the first-passage time distribution for an ensemble of particles
-        to reach a point x along the x-axis.
-        Display results as a histogram.
+        Obtain the first-passage time distribution for an ensemble of particles to reach a point x along the x-axis.
         
         Arguments:
             data: ABP position history
@@ -476,15 +557,17 @@ class ABP:
         first = np.argmax(crossed, axis=0)
         # Discard all unsuccessful attempts and convert to time units
         fpt = first[has_crossed] * self.dt
-        success_rate = np.round(len(fpt) / self.N * 100, 1)
-        # Build histogram of the FPTD
-        fig = plt.figure(figsize=[8, 6])
-        plt.hist(fpt, bins='auto')
-        plt.title(f"First-Passage Time Distribution\nTarget: {target}" + r"$\sigma$, " + f"Success Rate: {success_rate}%")
-        plt.xlabel("time [$1/D_r$]")
-        plt.ylabel("crossings")
-        plt.tight_layout()
-        plt.show()
+        success_rate = np.round(len(fpt) / self.N * 100, 2)
+        # Save data to file
+        filename = f'fptd data/fptd_x{target}_N{self.N}_{self.Ps}_{np.round(self.Pf/self.Ps, 6)}_{self.G}.txt'
+        with open(filename, 'w') as f:
+            f.write(f"# lp/w = {self.Ps}\n")
+            f.write(f"# Pf/Ps = {np.round(self.Pf/self.Ps, 6)}\n")
+            f.write(f"# G = {self.G}\n")
+            f.write(f"# target = {target}\n")
+            f.write(f"# success rate = {success_rate}\n")
+            np.savetxt(f, fpt)
+
 
     def initial_config(self):
         """
@@ -517,10 +600,25 @@ class ABP:
         Returns:
             indices of particle data in 'trapped' state
         """
-        # Extract y-position history and align with shape of x-velocity array
+        # Extract y-position history
         y = p[:, :, 1]
         # Return trapping condition
         return (vx < 0) & ((y < 0.05) | (y > 0.95))
+    
+    def wall_index(self, p):
+        """
+        Obtain the indices for proximity to the surface.
+        
+        Arguments:
+            p: reduced particle position history
+        
+        Returns:
+            indices of particle data near wall
+        """
+        # Extract y-position history
+        y = p[:, :, 1]
+        # Return wall condition
+        return ((y < 0.05) | (y > 0.95))
 
     def PDF(self, pos, orient):
         """
@@ -534,22 +632,58 @@ class ABP:
         # Decorrelate position and orientation data
         p = pos[::self.step][10:-1]
         o = orient[::self.step][10:-1]
+        # Get independent velocity data
+        vx = self.get_xspeed(pos)
+        #vy = self.get_yspeed(pos)
+        vx_independent = vx[::self.step][10:]
+        #vy_independent = vy[::self.step][10:]
+        #v = np.sqrt(vx_independent.flatten()**2 + vy_independent.flatten()**2)
         
         # Isolate vertical position from position data
         y = p[:, :, 1].flatten()
 
-        # Construct positional PDF
+        # Construct spatial PDF
         pdf1, edges1 = np.histogram(y, bins=50, density=True)
 
-        fig = plt.figure(figsize=[8, 6])
-        plt.stairs(pdf1, edges1, color='black')
-        plt.title(f"Spatial PDF: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
-        plt.xlabel("$y/w$")
-        plt.ylabel("$P(y/w)$")
-        plt.xlim(0, 1)
+        # Find average velocity at each section along channel width
+        mean_vx, _, _ = binned_statistic(y, vx_independent.flatten(), statistic='mean', bins=edges1)
+        bin_centres = 0.5 * (edges1[:-1] + edges1[1:])
+
+        fig, ax1 = plt.subplots(figsize=[8, 6])
+        ax1.stairs(pdf1, edges1, color='black')
+        ax1.set_title(f"Spatial PDF: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
+        ax1.set_xlabel("$y/w$")
+        ax1.set_ylabel("$P(y/w)$")
+        ax1.set_xlim(0, 1)
+
+        ax2 = ax1.twinx()  # instantiate a second Axes that shares the same x-axis
+
+        color = 'tab:green'
+        ax2.set_ylabel(r'$\langle v_x \rangle/v_0$', color=color)
+        ax2.plot(bin_centres, mean_vx/self.Ps, color=color)
+        ax2.tick_params(axis='y', labelcolor=color)
 
         # Isolate orientation angles from orientation data
         theta = np.arctan2(o[:, :, 1], o[:, :, 0]).flatten()
+
+        # Find average orientation at each section along channel width
+        mean_theta, _, _ = binned_statistic(y, theta, statistic='mean', bins=edges1)
+
+        # Plot spatial PDF with average orientation overlaid
+        fig, ax1 = plt.subplots(figsize=[8, 6])
+        ax1.stairs(pdf1, edges1, color='black')
+        ax1.set_title(f"Spatial PDF: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
+        ax1.set_xlabel("$y/w$")
+        ax1.set_ylabel("$P(y/w)$")
+        ax1.set_xlim(0, 1)
+
+        ax2 = ax1.twinx()  # instantiate a second Axes that shares the same x-axis
+
+        color = 'tab:red'
+        ax2.set_ylabel(r'$\langle \theta \rangle$', color=color)  # we already handled the x-label with ax1
+        ax2.plot(bin_centres, mean_theta, color=color)
+        ax2.tick_params(axis='y', labelcolor=color)
+        ax2.set_yticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
 
         # Construct orientational PDF
         pdf2, edges2 = np.histogram(theta, bins=50, density=True)
@@ -562,14 +696,12 @@ class ABP:
         plt.xlim(-np.pi, np.pi)
         plt.xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
 
-        # Find particle orientations near the surface
-        vx = self.get_xspeed(pos)
-        vx_independent = vx[::self.step][10:]
+        # Find particle orientations near the surface for upstream swimmers
         trap = self.trapping_index(p, vx_independent)
-        theta_sfc = theta[trap.flatten()]
+        theta_trap = theta[trap.flatten()]
 
-        # Construct orientational PDF near the surface
-        pdf3, edges3 = np.histogram(theta_sfc, bins=50, density=True)
+        # Construct orientational PDF near the surface for upstream swimmers
+        pdf3, edges3 = np.histogram(theta_trap, bins=50, density=True)
 
         fig = plt.figure(figsize=[8, 6])
         plt.stairs(pdf3, edges3, color='black')
@@ -579,6 +711,63 @@ class ABP:
         plt.xlim(-np.pi, np.pi)
         plt.xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
 
+        plt.tight_layout()
+        plt.show()
+
+    def TTD(self, pos, orient):
+        """
+        Record the trapping time distribution.
+        
+        Arguments:
+            pos: position history
+            orient: orientation history
+        """
+        # Separate transverse coordinate from positions
+        y = pos[:, :, 1]
+        # Get array of trapping times
+        tt = trapping_times(y, orient, self.N, self.dt)
+        # Save results to data file
+        filename = f'ttd data/ttd_N{self.N}_{self.Ps}_{np.round(self.Pf/self.Ps, 6)}_{self.G}.txt'
+        with open(filename, 'w') as f:
+            f.write(f"# lp/w = {self.Ps}\n")
+            f.write(f"# Pf/Ps = {np.round(self.Pf/self.Ps, 6)}\n")
+            f.write(f"# G = {self.G}\n")
+            np.savetxt(f, tt)
+
+    def Displacements(self, pos, orient):
+        """
+        Display the longitudinal displacements for the trajectory of a single ABP over time.
+        
+        Arguments:
+            pos: position history
+        """
+        # Calculate instantaneous displacements
+        dx = np.append([0], pos[1:, 0, 0] - pos[:-1, 0, 0]).flatten()
+        t = np.linspace(0, self.T * self.dt, self.T + 1)
+
+        
+        fig = plt.figure(figsize=[8, 6])
+        plt.title(f"Longitudinal displacements: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
+        plt.xlabel("$tD_r$")
+        plt.ylabel(r"$\Delta x(t)/w$")
+        plt.scatter(t, dx, color='black', s=1, marker='.', zorder=-1)
+
+        if show_traps:
+            # Calculate orientation angles
+            ex, ey = orient[:, 0, 0], orient[:, 0, 1]
+            theta = np.arctan2(ey, ex)
+            idx_s, idx_e, _ = track_traps(pos[:, 0, 1], self.dt, theta)
+            
+            plt.axvline(t[idx_s][0], color='blue', label='start')
+            for T in t[idx_s][1:]:
+                plt.axvline(T, color='blue')
+            plt.axvline(t[idx_e][0], color='orange', label='end')
+            for T in t[idx_e][1:]:
+                plt.axvline(T, color='orange')
+
+        plt.axvline(tau, color='black', linestyle='dotted', label=r'$t=\tau_r$')
+        plt.legend(loc='lower right')
+        
         plt.tight_layout()
         plt.show()
 
@@ -598,12 +787,18 @@ if __name__ == "__main__":
     parser.add_argument('-Ps', type=float, default=5, help='Swim Peclet number')
     parser.add_argument('-Pf', type=float, default=5, help='Flow Peclet number')
     parser.add_argument('-D', type=float, default=0.1, help='Dimensionless ratio of diffusion constants')
-    parser.add_argument('-x', type=float, default=50, help='Distance along x-axis to check for first-passage')
+    parser.add_argument('-x', type=float, default=20, help='Distance along x-axis to check for first-passage')
     parser.add_argument('-G', type=float, default=0, help='Geometrical factor related to particle aspect ratio')
     parser.add_argument('--init', action='store_true', help='View the initial configuration of the system')
+    parser.add_argument('--TTD', action='store_true', help='Obtain the trapping time distribution')
+    parser.add_argument('--DX', action='store_true', help='Display the longitudinal displacements over time')
+    parser.add_argument('-m', type=int, choices=[1, 2, 3], default=None, help="Choose method for trapping times")
     args = parser.parse_args()
 
-    abp = ABP(args.N, args.T, args.dt, args.Ps, args.D, args.Pf, args.G)
+    if args.FPTD:
+        fptd_start = True
+
+    abp = ABP(args.N, args.T, args.dt, args.Ps, args.D, args.Pf, args.G, args.m)
 
     if args.init:
         abp.initial_config()
@@ -612,11 +807,15 @@ if __name__ == "__main__":
 
     if args.trajectory:
         abp.Trajectory(pos, orient)
+    if args.DX:
+        abp.Displacements(pos, orient)
     if args.MSD:
         abp.MSD(pos)
     if args.variance:
         abp.Variance(pos)
-    if args.FPTD:
-        abp.FPTD(pos, args.x)
     if args.PDF:
         abp.PDF(pos, orient)
+    if args.TTD:
+        abp.TTD(pos, orient)
+    if args.FPTD:
+        abp.FPTD(pos, args.x)
