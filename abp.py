@@ -229,7 +229,7 @@ class ABP:
     An ensemble of active Brownian particles experiencing Poisseuille flow in a confined geometry.
     """
 
-    def __init__(self, N, T, dt, Ps, D, Pf, G, m):
+    def __init__(self, N, T, dt, Ps, D, Pf, G):
         """
         Initialise N realisations of the same particle at the origin with random orientations.
         
@@ -251,7 +251,6 @@ class ABP:
         self.D = D
         self.Pf = Pf
         self.G = G
-        self.m = m
         self.step = int(1 / dt)
         # Initialise orientation vector of each particle from a uniform rotationally symmetric distribution
         distribution = uniform_direction(2)
@@ -792,13 +791,12 @@ if __name__ == "__main__":
     parser.add_argument('--init', action='store_true', help='View the initial configuration of the system')
     parser.add_argument('--TTD', action='store_true', help='Obtain the trapping time distribution')
     parser.add_argument('--DX', action='store_true', help='Display the longitudinal displacements over time')
-    parser.add_argument('-m', type=int, choices=[1, 2, 3], default=None, help="Choose method for trapping times")
     args = parser.parse_args()
 
     if args.FPTD:
         fptd_start = True
 
-    abp = ABP(args.N, args.T, args.dt, args.Ps, args.D, args.Pf, args.G, args.m)
+    abp = ABP(args.N, args.T, args.dt, args.Ps, args.D, args.Pf, args.G)
 
     if args.init:
         abp.initial_config()
