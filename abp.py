@@ -296,9 +296,9 @@ class ABP:
         # Return MSDs
         return msd_xy, msd_tot
     
-    def get_MSD_powerlaw(self, data):
+    def get_powerlaw(self, data):
         """
-        Obtain the power-law dependence of an MSD dataset.
+        Obtain the late-time power-law dependence of a dataset.
         
         Argument:
             data: dependent data
@@ -369,7 +369,7 @@ class ABP:
         msd_b = self.Ps**2 * t**2 + 2 * d * self.D**2 * t
         msd_d = 2 * t * (d * self.D**2 + self.Ps**2 * tau)
         # Perform fit to late-time data
-        a, b = self.get_MSD_powerlaw(msd, t)
+        a, b = self.get_powerlaw(msd, t)
         t_fit = np.linspace(tau/self.dt, self.T, 100) * self.dt
         msd_fit = np.exp(b) * t_fit**a
         # Calculate MSD at t = 10*tau
@@ -391,7 +391,7 @@ class ABP:
 
         # Calculate MSD in the x-direction and line of best fit fit
         msd_x = msd_xy[:, 0]
-        a_x, b_x = self.get_MSD_powerlaw(msd_x)
+        a_x, b_x = self.get_powerlaw(msd_x)
         msd_x_fit = np.exp(b_x) * t_fit**a_x
         # Calculate MSD at t = 10*tau
         msd_x_fit_10 = np.exp(b_x) * (10*tau)**a_x
@@ -411,7 +411,7 @@ class ABP:
 
         # Calculate MSD in the y-direction and line of best fit fit
         msd_y = msd_xy[:, 1]
-        a_y, b_y = self.get_MSD_powerlaw(msd_y)
+        a_y, b_y = self.get_powerlaw(msd_y)
         msd_y_fit = np.exp(b_y) * t_fit**a_y
         # Calculate MSD at t = 10*tau
         msd_y_fit_10 = np.exp(b_y) * (10*tau)**a_y

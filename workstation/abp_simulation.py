@@ -42,7 +42,7 @@ def phase_diagram(filename, N, T, dt, D, l1, u1, l2, u2, n, G):
                 pos, _ = abp.Run()
                 # Get MSD scaling exponent
                 msd_xy, msd = abp.get_MSD(pos)
-                a, _ = abp.get_MSD_powerlaw(msd_xy[:, 0])
+                a, _ = abp.get_powerlaw(msd_xy[:, 0])
                 # Get mean x-velocity
                 vx = abp.get_xspeed(pos)
                 vx_independent = vx[::abp.step][10:]
