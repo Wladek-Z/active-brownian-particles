@@ -19,6 +19,7 @@ noise_r = 1
 use_arrows = False
 centre_start = False
 show_traps = False
+fptd_start = False
 
 @njit
 def run(N, p, e, T, dt, Ps, D, Pf, G):
@@ -795,8 +796,6 @@ if __name__ == "__main__":
 
     if args.FPTD:
         fptd_start = True
-    else:
-        fptd_start = False
 
     abp = ABP(args.N, args.T, args.dt, args.Ps, args.D, args.Pf, args.G)
 
