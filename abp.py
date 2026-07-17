@@ -369,11 +369,12 @@ class ABP:
         msd_b = self.Ps**2 * t**2 + 2 * d * self.D**2 * t
         msd_d = 2 * t * (d * self.D**2 + self.Ps**2 * tau)
         # Perform fit to late-time data
-        a, b = self.get_powerlaw(msd, t)
+        a, b = self.get_powerlaw(msd)
+        B = np.exp(b)
         t_fit = np.linspace(tau/self.dt, self.T, 100) * self.dt
-        msd_fit = np.exp(b) * t_fit**a
+        msd_fit = B * t_fit**a
         # Calculate MSD at t = 10*tau
-        msd_fit_10 = np.exp(b) * (10*tau)**a
+        msd_fit_10 = B * (10*tau)**a
 
         # Plot MSD with fit and theory lines
         fig = plt.figure(figsize=[8, 6])
@@ -386,15 +387,19 @@ class ABP:
         plt.axvline(tau, color='black', linestyle='dotted', label=r'$t=\tau_r$')
         plt.xlabel("$tD_r$")
         plt.ylabel(r"$\langle (\Delta r)^2 \rangle/w^2$")
-        plt.text(10*tau, 0.75*msd_fit_10, r'$\alpha$ = ' + f'{np.round(a, 2)}', ha='left', va='top', fontsize=12)
+        if a < 1.5:
+            plt.text(10*tau, 0.75*msd_fit_10, r'$\alpha$ = ' + f'{np.round(a, 2)}\n' + r'$D_{\mathrm{eff}}$ = ' + f'{np.round(B/2/d, 2)}', ha='left', va='top', fontsize=12)
+        else:
+            plt.text(10*tau, 0.75*msd_fit_10, r'$\alpha$ = ' + f'{np.round(a, 2)}', ha='left', va='top', fontsize=12)
         plt.legend(loc='upper left')
 
         # Calculate MSD in the x-direction and line of best fit fit
         msd_x = msd_xy[:, 0]
         a_x, b_x = self.get_powerlaw(msd_x)
-        msd_x_fit = np.exp(b_x) * t_fit**a_x
+        B_x = np.exp(b_x)
+        msd_x_fit = B_x * t_fit**a_x
         # Calculate MSD at t = 10*tau
-        msd_x_fit_10 = np.exp(b_x) * (10*tau)**a_x
+        msd_x_fit_10 = B_x * (10*tau)**a_x
 
         fig = plt.figure(figsize=[8, 6])
         plt.title(f"MSD$_x$: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
@@ -406,15 +411,19 @@ class ABP:
         plt.axvline(tau, color='black', linestyle='dotted', label=r'$t=\tau_r$')
         plt.xlabel("$tD_r$")
         plt.ylabel(r"$\langle (\Delta x)^2 \rangle/w^2$")
-        plt.text(10*tau, 0.75*msd_x_fit_10, r'$\alpha$ = ' + f'{np.round(a_x, 2)}', ha='left', va='top', fontsize=12)
+        if a_x < 1.5:
+            plt.text(10*tau, 0.75*msd_fit_10, r'$\alpha$ = ' + f'{np.round(a_x, 2)}\n' + r'$D_{\mathrm{eff}}$ = ' + f'{np.round(B_x/2/d, 2)}', ha='left', va='top', fontsize=12)
+        else:
+            plt.text(10*tau, 0.75*msd_fit_10, r'$\alpha$ = ' + f'{np.round(a_x, 2)}', ha='left', va='top', fontsize=12)
         plt.legend(loc='upper left')
 
         # Calculate MSD in the y-direction and line of best fit fit
         msd_y = msd_xy[:, 1]
         a_y, b_y = self.get_powerlaw(msd_y)
-        msd_y_fit = np.exp(b_y) * t_fit**a_y
+        B_y = np.exp(b_y)
+        msd_y_fit = B_y * t_fit**a_y
         # Calculate MSD at t = 10*tau
-        msd_y_fit_10 = np.exp(b_y) * (10*tau)**a_y
+        msd_y_fit_10 = B_y * (10*tau)**a_y
 
         fig = plt.figure(figsize=[8, 6])
         plt.title(f"MSD$_y$: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
