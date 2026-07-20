@@ -254,7 +254,7 @@ class ABP:
     An ensemble of active Brownian particles experiencing Poisseuille flow in a confined geometry.
     """
 
-    def __init__(self, N, T, dt, Ps, D, Pf, G, fptd):
+    def __init__(self, N, T, dt, Ps, D, Pf, G, fptd=False):
         """
         Initialise N realisations of the same particle at the origin with random orientations.
         
