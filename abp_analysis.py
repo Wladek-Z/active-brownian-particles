@@ -546,13 +546,13 @@ def effective_constants(filename):
     # Plot results
     fig = plt.figure(figsize=[8, 6])
     plt.title(f"MSD$_x$ effective constants: $l_p/w$ = {Ps}, $D$ = {D}, $G$ = {G}")
-    plt.scatter(data['Pf_D'], data['D_eff'], color='red', marker='.', s=20, label=r'$D_{\mathrm{eff}}$')
-    plt.scatter(data['Pf_P'], data['P_eff'], color='blue', marker='.', s=20, label=r'$Pe_{s,\mathrm{eff}}$')
+    plt.scatter(data['PfPs_D'], data['D_eff'], color='red', linestyle='-o', markersize=4, label=r'$D_{\mathrm{eff}}$')
+    plt.scatter(data['PfPs_P'], data['P_eff'], color='blue', linestyle='-o', markersize=4, label=r'$Pe_{s,\mathrm{eff}}$')
     plt.xlabel("$Pe_f/Pe_s$")
     plt.ylabel("value of constant")
     plt.axhline(D_eff_noflow, color='black', linestyle='--', label='no flow', alpha=0.5)
     plt.axhline(Ps, color='black', linestyle='dotted', label='$Pe_s$', alpha=0.5)
-    plt.legend(loc='upper right')
+    plt.legend(loc='upper left')
     
     plt.tight_layout()
     plt.show()
@@ -571,6 +571,7 @@ if __name__ == "__main__":
     parser.add_argument('--TTD', action='store_true', help='Display the trapping time distribution')
     parser.add_argument('--TTD3', action='store_true', help='Display the trapping time distribution for three phases')
     parser.add_argument('--FPTD', action='store_true', help='Display the first passage time distribution')
+    parser.add_argument('--eff', action='store_true', help='Plot effective diffusivities/Peclet numbers along an axis')
     args = parser.parse_args()
 
     if args.PD:
@@ -587,3 +588,5 @@ if __name__ == "__main__":
         TTD3(args.f1, args.f2, args.f3)
     if args.FPTD:
         FPTD(args.f1)
+    if args.eff:
+        effective_constants(args.f1)

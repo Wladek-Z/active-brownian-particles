@@ -154,16 +154,17 @@ def effective_constants(filename, N, T, dt, Ps, D, G, l, u, n):
         n: number of data points to consider
     """
     nums = np.linspace(l, u, n)
-    Pf_list = np.round(nums * Ps, 6)
     # Record parameters
     params = np.array([Ps, D, G])
-    # Initialise empty arrays for effective diffusivities/Peclet numbers
-    D_eff = np.empty(0)
-    P_eff = np.empty(0)
-    Pf_D = np.empty(0)
-    Pf_P = np.empty(0)
+    # Initialise nan arrays for effective diffusivities/Peclet numbers
+    D_eff = np.full(n, np.nan)
+    P_eff = np.full(n, np.nan)
+    PfPs_D = np.full(n, np.nan)
+    PfPs_P = np.full(n, np.nan)
     # Iterate over every flow Peclet number
-    for Pf in Pf_list:
+    for i in range(n):
+        # Calculate flow Peclet number
+        Pf = nums[i] * Ps
         # Construct ABP object
         abp = ABP(N, T, dt, Ps, D, Pf, G)
         # Run simulation
@@ -174,14 +175,14 @@ def effective_constants(filename, N, T, dt, Ps, D, G, l, u, n):
         # Save to different arrays depending on power of exponent
         if a < 1.5:
             B = np.round(np.exp(b)/2/d, 6)
-            D_eff = np.append(D_eff, B)
-            Pf_D = np.append(Pf_D, Pf)
+            D_eff[i] = B
+            PfPs_D[i] = nums[i]
         else:
             B = np.round(np.sqrt(np.exp(b)), 6)    
-            P_eff = np.append(P_eff, B)
-            Pf_P = np.append(Pf_P, Pf)   
+            P_eff[i] = B
+            PfPs_P[i] = nums[i] 
     # Save data to file
-    np.savez(filename, p=params, Pf_D=Pf_D, D_eff=D_eff, Pf_P=Pf_P, P_eff=P_eff)
+    np.savez(filename, p=params, PfPs_D=PfPs_D, D_eff=D_eff, PfPs_P=PfPs_P, P_eff=P_eff)
 
 if __name__ == "__main__":
     # Parse command line arguments
