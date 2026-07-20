@@ -416,6 +416,7 @@ class ABP:
         else:
             plt.text(10*tau, 0.75*msd_fit_10, r'$\alpha$ = ' + f'{np.round(a, 2)}\n' + r'$Pe_{s,\mathrm{eff}}$ = ' + f'{np.round(np.sqrt(B), 2)}', ha='left', va='top', fontsize=12)
         plt.legend(loc='upper left')
+        plt.tight_layout()
 
         # Calculate MSD in the x-direction and line of best fit fit
         msd_x = msd_xy[:, 0]
@@ -440,6 +441,7 @@ class ABP:
         else:
             plt.text(10*tau, 0.75*msd_x_fit_10, r'$\alpha$ = ' + f'{np.round(a_x, 2)}\n' + r'$Pe_{s,\mathrm{eff}}$ = ' + f'{np.round(np.sqrt(B_x), 2)}', ha='left', va='top', fontsize=12)
         plt.legend(loc='upper left')
+        plt.tight_layout()
 
         # Calculate MSD in the y-direction and line of best fit fit
         msd_y = msd_xy[:, 1]
@@ -461,8 +463,8 @@ class ABP:
         plt.ylabel(r"$\langle (\Delta y)^2 \rangle/w^2$")
         plt.text(10*tau, 0.5*msd_y_fit_10, r'$\alpha$ = ' + f'{np.round(a_y, 2)}', ha='left', va='top', fontsize=12)
         plt.legend(loc='upper left')
-
         plt.tight_layout()
+
         plt.show()
 
     def get_variance(self, x):
@@ -525,23 +527,24 @@ class ABP:
 
     def Trajectory(self, data, data1):
         """
-        Retrieve the positions of an ensemble of particles over time, as well
-        as their orientations at intervals during the first 10% of timesteps.
-        Plot results on a graph.
+        Plot the trajectory of a single particle from its position and orientation history. One
+        graph will show the trajectory with the option to show traps, whilst the other includes
+        arrows denoting the orientation of the particle every number of timesteps.
         
         Arguments:
             data: position history
             data1: orientation history
-        """
-        fig = plt.figure(figsize=[8, 6])
-        plt.title(f"Trajectory: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
-        
+        """        
         # Consider only first particle
         x, y = data[:, 0, 0], data[:, 0, 1]
         start_x, start_y = data[0, 0, 0], data[0, 0, 1]
         end_x, end_y = data[-1, 0, 0], data[-1, 0, 1]
 
+        # Plot regular trajectory with optional traps
+        fig = plt.figure(figsize=[8, 6])
+        plt.title(f"Trajectory: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
 
+        # Show start and end points of trajectory
         plt.scatter(start_x, start_y, color='lime', s=20, zorder=1)
         plt.scatter(end_x, end_y, color='red', s=20, zorder=1)
 
@@ -550,7 +553,7 @@ class ABP:
             dx, dy = data1[:, 0, 0], data1[:, 0, 1]
             theta = np.arctan2(dy, dx)
             idx_s, idx_e, _ = track_traps(y, self.dt, theta)
-
+            # Show traps
             plt.scatter(x[idx_s], y[idx_s], color='cyan', s=15, zorder=1)
             plt.scatter(x[idx_e], y[idx_e], color='orange', s=15, zorder=1)
 
@@ -560,15 +563,31 @@ class ABP:
         plt.ylabel(r"$y/w$")
         plt.axhline(0, color='black', linestyle='--', alpha=0.5)
         plt.axhline(1, color='black', linestyle='--', alpha=0.5)
-        # Plot early-time orientations along trajectory
-        if use_arrows:
-            spacing = 5 #min(2000, self.T // 50)
-            # Create array of arrow directions
-            dx, dy = dx[::spacing], dy[::spacing]
-            # Create array of arrow bases
-            X, Y = x[::spacing], y[::spacing]
-            # Make quiver plot
-            plt.quiver(X, Y, dx, dy, color='red', width=0.002, headwidth=3, headlength=4, scale=25, zorder=-1)
+        plt.tight_layout()
+
+        # Show trajectory with orientation directions overlaid
+        fig = plt.figure(figsize=[8, 6])
+        plt.title(f"Trajectory: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
+        
+        # Show start and end points
+        plt.scatter(start_x, start_y, color='lime', s=20, zorder=1)
+        plt.scatter(end_x, end_y, color='red', s=20, zorder=1)
+
+        #plt.scatter(x, y, color='black', marker='.', s=1, zorder=-1)
+        plt.plot(x, y, color='black', zorder=-1)
+        plt.xlabel(r"$x/w$")
+        plt.ylabel(r"$y/w$")
+        plt.axhline(0, color='black', linestyle='--', alpha=0.5)
+        plt.axhline(1, color='black', linestyle='--', alpha=0.5)
+        # Construct orientation arrows
+        spacing = 10 #min(2000, self.T // 50)
+        # Create array of arrow directions
+        dx, dy = dx[::spacing], dy[::spacing]
+        # Create array of arrow bases
+        X, Y = x[::spacing], y[::spacing]
+        # Make quiver plot
+        plt.quiver(X, Y, dx, dy, color='red', width=0.002, headwidth=3, headlength=4, scale=25, zorder=-1)
+        
         plt.tight_layout()
         plt.show()
     
@@ -699,6 +718,7 @@ class ABP:
         ax2.set_ylabel(r'$\langle v_x \rangle/v_0$', color=color)
         ax2.plot(bin_centres, mean_vx/self.Ps, color=color)
         ax2.tick_params(axis='y', labelcolor=color)
+        plt.tight_layout()
 
         # Isolate orientation angles from orientation data
         theta = np.arctan2(o[:, :, 1], o[:, :, 0]).flatten()
@@ -721,6 +741,7 @@ class ABP:
         ax2.plot(bin_centres, mean_theta, color=color)
         ax2.tick_params(axis='y', labelcolor=color)
         ax2.set_yticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
+        plt.tight_layout()
 
         # Construct orientational PDF
         pdf2, edges2 = np.histogram(theta, bins=50, density=True)
@@ -732,6 +753,7 @@ class ABP:
         plt.ylabel(r"$P(\theta)$")
         plt.xlim(-np.pi, np.pi)
         plt.xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
+        plt.tight_layout()
 
         # Find particle orientations near the surface for upstream swimmers
         trap = self.trapping_index(p, vx_independent)
@@ -747,8 +769,8 @@ class ABP:
         plt.ylabel(r"$P(\theta)$")
         plt.xlim(-np.pi, np.pi)
         plt.xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
-
         plt.tight_layout()
+
         plt.show()
 
     def TTD(self, pos, orient):
@@ -764,7 +786,10 @@ class ABP:
         # Get array of trapping times
         tt = trapping_times(y, orient, self.N, self.dt)
         # Save results to data file
-        filename = f'ttd data/ttd_N{self.N}_{self.Ps}_{np.round(self.Pf/self.Ps, 6)}_{self.G}.txt'
+        if vorticity == 1:
+            filename = f'ttd data/ttd_N{self.N}_{self.Ps}_{np.round(self.Pf/self.Ps, 6)}_{self.G}.txt'
+        else:
+            filename = f'ttd data/ttd_N{self.N}_{self.Ps}_{np.round(self.Pf/self.Ps, 6)}_{self.G}_NV.txt'
         with open(filename, 'w') as f:
             f.write(f"# lp/w = {self.Ps}\n")
             f.write(f"# Pf/Ps = {np.round(self.Pf/self.Ps, 6)}\n")

@@ -10,6 +10,9 @@ import os
 
 jobid = os.environ.get("SLURM_JOB_ID", "local")
 
+# Define dimensionality of the system
+d = 2
+
 def phase_diagram(filename, N, T, dt, D, l1, u1, l2, u2, n, G):
     """
     Collect data for various phase diagrams of the ABP system by varying the ration of both
@@ -133,6 +136,52 @@ def collect_histogram(folder, N, T, dt, Ps, w, D, mu, Pf, G, bins):
     # Save data to npz file
     np.savez(f'{folder}/data_{jobid}.npz', pdf1=pdf1, edges1=edges1, pdf2=pdf2, edges2=edges2, pdf3=pdf3, edges3=edges3)
 
+def effective_constants(filename, N, T, dt, Ps, D, G, l, u, n):
+    """
+    Calculate the effective diffusivity or Peclet number as a function of the
+    Peclet number ratio.
+    
+    Arguments:
+        filename: path to save data
+        N: number of particles
+        T: number of timesteps
+        dt: timestep
+        Ps: swim Peclet number
+        D: dimensionless translational diffusivity
+        G: elongation factor
+        l: lower bound of data
+        u: upper bound of data
+        n: number of data points to consider
+    """
+    nums = np.linspace(l, u, n)
+    Pf_list = np.round(nums * Ps, 6)
+    # Record parameters
+    params = np.array([Ps, D, G])
+    # Initialise empty arrays for effective diffusivities/Peclet numbers
+    D_eff = np.empty(0)
+    P_eff = np.empty(0)
+    Pf_D = np.empty(0)
+    Pf_P = np.empty(0)
+    # Iterate over every flow Peclet number
+    for Pf in Pf_list:
+        # Construct ABP object
+        abp = ABP(N, T, dt, Ps, D, Pf, G)
+        # Run simulation
+        pos, orient = abp.Run()
+        # Get MSDx scaling exponent
+        msd_xy, msd = abp.get_MSD(pos)
+        a, b = abp.get_powerlaw(msd_xy[:, 0])
+        # Save to different arrays depending on power of exponent
+        if a < 1.5:
+            B = np.round(np.exp(b)/2/d, 6)
+            D_eff = np.append(D_eff, B)
+            Pf_D = np.append(Pf_D, Pf)
+        else:
+            B = np.round(np.sqrt(np.exp(b)), 6)    
+            P_eff = np.append(P_eff, B)
+            Pf_P = np.append(Pf_P, Pf)   
+    # Save data to file
+    np.savez(filename, p=params, Pf_D=Pf_D, D_eff=D_eff, Pf_P=Pf_P, P_eff=P_eff)
 
 if __name__ == "__main__":
     # Parse command line arguments
@@ -157,6 +206,7 @@ if __name__ == "__main__":
     parser.add_argument('--trajectory', action='store_true', help='Find the particle trajectory')
     parser.add_argument('-bins', type=int, default=50, help='Number of bins to use in histogram')
     parser.add_argument('--hist', action='store_true', help='Collect data to construct histograms')
+    parser.add_argument('--eff', action='store_true', help='Collect data on effective diffusivities/Peclet numbers along an axis')
     args = parser.parse_args()
 
     if args.PD:
@@ -165,3 +215,5 @@ if __name__ == "__main__":
         phase_diagram_x(args.f, args.N, args.T, args.dt, args.D, args.l1, args.u1, args.l2, args.u2, args.n, args.G)
     elif args.hist:
         collect_histogram(args.F, args.N, args.T, args.dt, args.Ps, args.D, args.Pf, args.G, args.bins)
+    elif args.eff:
+        effective_constants(args.f, args.N, args.T, args.dt, args.Ps, args.D, args.G, args.l, args.u, args.n)

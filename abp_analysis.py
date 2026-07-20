@@ -12,6 +12,7 @@ plt.style.use('science')
 plt.rcParams['text.usetex'] = False
 
 tau = 1
+d = 2
 
 def phase_diagram(filename):
     """
@@ -45,6 +46,7 @@ def phase_diagram(filename):
     plt.colorbar(label=r'$\alpha$')
     plt.xlabel("$l_p/w$")
     plt.ylabel("$Pe_f/Pe_s$")
+    plt.tight_layout()
 
     # Normalise divergent colormap
     norm_vx = colors.TwoSlopeNorm(vmin=VX.min(), vcenter=0, vmax=VX.max())
@@ -56,6 +58,7 @@ def phase_diagram(filename):
     plt.colorbar(label=r'$\langle v_x \rangle/wD_r$')
     plt.xlabel("$l_p/w$")
     plt.ylabel("$Pe_f/Pe_s$")
+    plt.tight_layout()
 
     # Normalise divergent colormap for variance
     norm_var = colors.TwoSlopeNorm(vmin=np.nanmin(B), vcenter=1, vmax=np.nanmax(B))
@@ -67,8 +70,8 @@ def phase_diagram(filename):
     cbar = plt.colorbar(label=r'$\beta$', spacing='proportional')
     plt.xlabel("$l_p/w$")
     plt.ylabel("$Pe_f/Pe_s$")
-
     plt.tight_layout()
+
     plt.show()
 
 def pd_comparison(filename1, filename2):
@@ -212,94 +215,45 @@ def pd3_comparison(filename1, filename2, filename3):
     # Find minimum/maximum values for alpha
     vmin = np.round(min(np.nanmin(A1), np.nanmin(A2), np.nanmin(A3)), 2)
     vmax = np.round(max(np.nanmax(A1), np.nanmax(A2), np.nanmax(A3)), 2)
-
-    # Define custom colormap
-    colours = ['blue', 'white', 'red']
-    cmap = colors.ListedColormap(colours)
-    boundaries = np.array([vmin, 1.2, 1.8, vmax])
-    norm_a = colors.BoundaryNorm(boundaries, cmap.N)
+    # Normalise divergent colormap
+    norm_a = colors.TwoSlopeNorm(vmin=vmin, vcenter=1.5, vmax=vmax)
 
     # Define function for plotting MSD scaling exponents
     def scaling_plot(data1, data2, data3, title, label, norm):
         fig, axes = plt.subplots(1, 3, figsize=[21, 5], constrained_layout=True, sharey=True)
-        mesh1 = axes[0].pcolormesh(X1, Y1, data1, cmap=cmap, norm=norm, shading='auto')
+        mesh1 = axes[0].pcolormesh(X1, Y1, data1, cmap='bwr', norm=norm, shading='auto')
         axes[0].set_title('vorticity, shear')
         axes[0].set_xlabel("$l_p/w$")
         axes[0].set_ylabel("$Pe_f/Pe_s$")
-        mesh2 = axes[1].pcolormesh(X2, Y2, data2, cmap=cmap, norm=norm, shading='auto')
+        mesh2 = axes[1].pcolormesh(X2, Y2, data2, cmap='bwr', norm=norm, shading='auto')
         axes[1].set_title('vorticity, no shear')
         axes[1].set_xlabel("$l_p/w$")
-        mesh3 = axes[2].pcolormesh(X3, Y3, data3, cmap=cmap, norm=norm, shading='auto')
+        mesh3 = axes[2].pcolormesh(X3, Y3, data3, cmap='bwr', norm=norm, shading='auto')
         axes[2].set_title('no vorticity, no shear')
         axes[2].set_xlabel("$l_p/w$")
         fig.suptitle(title)
-        cbar = fig.colorbar(mesh3, ax=axes, location='right', label=label, boundaries=boundaries, spacing='proportional')
-        cbar.set_ticks(boundaries)
-        cbar.set_ticklabels(boundaries)
+        fig.colorbar(mesh3, ax=axes, location='right', label=label)
         return fig
     
     # Plot comparison of MSD scaling exponents
     scaling_plot(A1, A2, A3, 'MSD$_x$ scaling exponent', r'$\alpha$', norm_a)
     
-    # Normalise divergent colormap for variance
+    # Find min/max values of variance scaling exponent
     vmin = min(np.nanmin(B1), np.nanmin(B2), np.nanmin(B3))
     vmax = max(np.nanmax(B1), np.nanmax(B2), np.nanmax(B3))
+    # Normalise divergent colormap
     norm_var = colors.TwoSlopeNorm(vmin=vmin, vcenter=1, vmax=vmax)
+    # Plot comparison of variance scaling exponents
+    scaling_plot(B1, B2, B3, r'Var($\Delta x$) scaling exponent', r'$\beta$', norm_var)
 
-    # Plot comparison of variance scaling exponents    
-    fig, axes = plt.subplots(1, 3, figsize=[21, 5], constrained_layout=True, sharey=True)
-    mesh1 = axes[0].pcolormesh(X1, Y1, B1, cmap='bwr', shading='auto', norm=norm_var)
-    axes[0].set_title('vorticity, shear')
-    axes[0].set_xlabel("$l_p/w$")
-    axes[0].set_ylabel("$Pe_f/Pe_s$")
-    mesh2 = axes[1].pcolormesh(X2, Y2, B2, cmap='bwr', shading='auto', norm=norm_var)
-    axes[1].set_title('vorticity, no shear')
-    axes[1].set_xlabel("$l_p/w$")
-    mesh3 = axes[2].pcolormesh(X3, Y3, B3, cmap='bwr', shading='auto', norm=norm_var)
-    axes[2].set_title('no vorticity, no shear')
-    axes[2].set_xlabel("$l_p/w$")
-    fig.suptitle(r'Var($\Delta x$) scaling exponent')
-    fig.colorbar(mesh3, ax=axes, location='right', label=r'$\beta$')
-
-    # Normalise divergent colormap for <vx>
+    # Find min/max values for <vx>
     vmin = min(np.nanmin(VX1), np.nanmin(VX2), np.nanmin(VX3))
     vmax = max(np.nanmax(VX1), np.nanmax(VX2), np.nanmax(VX3))
+    # Normalise divergent colormap
     norm_vx = colors.TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)
+    # Plot comparison of mean longitudinal velocity
+    scaling_plot(VX1, VX2, VX3, "Mean longitudinal velocity", r"$\langle v_x \rangle/wD_r$", norm_vx)
 
-    # Plot comparison of mean longitudinal velocity    
-    fig, axes = plt.subplots(1, 3, figsize=[21, 5], constrained_layout=True, sharey=True)
-    mesh1 = axes[0].pcolormesh(X1, Y1, VX1, cmap='bwr', shading='auto', norm=norm_vx)
-    axes[0].set_title('vorticity, shear')
-    axes[0].set_xlabel("$l_p/w$")
-    axes[0].set_ylabel("$Pe_f/Pe_s$")
-    mesh2 = axes[1].pcolormesh(X2, Y2, VX2, cmap='bwr', shading='auto', norm=norm_vx)
-    axes[1].set_title('vorticity, no shear')
-    axes[1].set_xlabel("$l_p/w$")
-    mesh3 = axes[2].pcolormesh(X3, Y3, VX3, cmap='bwr', shading='auto', norm=norm_vx)
-    axes[2].set_title('no vorticity, no shear')
-    axes[2].set_xlabel("$l_p/w$")
-    fig.suptitle("Mean longitudinal velocity")
-    fig.colorbar(mesh3, ax=axes, location='right', label=r"$\langle v_x \rangle/wD_r$")
-
-    # Find minimum/maximum values for trapping fraction
-    vmin = min(np.nanmin(TF1), np.nanmin(TF2), np.nanmin(TF3))
-    vmax = max(np.nanmax(TF1), np.nanmax(TF2), np.nanmax(TF3))
-
-    # Plot comparison of trapping fractions
-    fig, axes = plt.subplots(1, 3, figsize=[21, 5], constrained_layout=True, sharey=True)
-    mesh1 = axes[0].pcolormesh(X1, Y1, TF1, cmap='autumn', shading='auto', vmin=vmin, vmax=vmax)
-    axes[0].set_title('vorticity, shear')
-    axes[0].set_xlabel("$l_p/w$")
-    axes[0].set_ylabel("$Pe_f/Pe_s$")
-    mesh2 = axes[1].pcolormesh(X2, Y2, TF2, cmap='autumn', shading='auto', vmin=vmin, vmax=vmax)
-    axes[1].set_title('vorticity, no shear')
-    axes[1].set_xlabel("$l_p/w$")
-    mesh3 = axes[2].pcolormesh(X3, Y3, TF3, cmap='autumn', shading='auto', vmin=vmin, vmax=vmax)
-    axes[2].set_title('no vorticity, no shear')
-    axes[2].set_xlabel("$l_p/w$")
-    fig.suptitle("% time spent swimming upstream at the surface")
-    fig.colorbar(mesh3, ax=axes, location='right', label="trapping fraction")
-    
     plt.show()
 
 def pdx_comparison(filename1):
@@ -448,7 +402,7 @@ def TTD(filename):
 
     # Plot results
     fig = plt.figure(figsize=[8, 6])
-    plt.scatter(bin_centres, counts, color='black', marker='.', s=10, label='simulation')
+    plt.scatter(bin_centres, counts, color='black', marker='.', s=20, label='simulation')
     plt.title(f"$l_p/w$ = {lp_w}, $Pe_f/Pe_s$ = {Ps_Pf}, $G$ = {G}")
     #plt.plot(tfit, yfit, color='magenta', label=r'$Ae^{\gamma T} + Be^{-\zeta T}$')
     plt.xlabel("$tD_r$")
@@ -560,12 +514,46 @@ def FPTD(filename):
     # Build histogram of the FPTD
     fig = plt.figure(figsize=[8, 6])
     plt.scatter(bin_centres, counts, color='black', marker='.', s=20)
+    #plt.plot(bin_centres, counts, color='black', linestyle='--')
     #plt.stairs(counts, bins, color='black')
     plt.title(f"FPTD: $l_p/w$ = {lp_w}, $Pe_f/Pe_s$ = {Ps_Pf}, $G$ = {G}, $x_T/w$ = {target}, success rate = {success_rate}%")
     plt.xlabel("$tD_r$")
     plt.ylabel("probability density")
     plt.yscale('log')
+    #plt.xscale('log')
 
+    plt.tight_layout()
+    plt.show()
+
+def effective_constants(filename):
+    """
+    Plot effective diffusivities and Peclet numbers along an axis of the
+    Pf/Ps - lp/w phase diagram.
+    
+    Arguments:
+        filename: filepath to stored data
+    """
+    # Load data and read in parameters
+    data = np.load(filename)
+    params = data['p']
+    Ps = params[0]
+    D = params[1]
+    G = params[2]
+    
+    # Calculate effective diffusivity in the absence of flow
+    D_eff_noflow = D**2 + Ps**2 / 4
+
+    # Plot results
+    fig = plt.figure(figsize=[8, 6])
+    plt.title(f"MSD$_x$ effective constants: $l_p/w$ = {Ps}, $D$ = {D}, $G$ = {G}")
+    plt.scatter(data['Pf_D'], data['D_eff'], color='red', marker='.', s=20, label=r'$D_{\mathrm{eff}}$')
+    plt.scatter(data['Pf_P'], data['P_eff'], color='blue', marker='.', s=20, label=r'$Pe_{s,\mathrm{eff}}$')
+    plt.xlabel("$Pe_f/Pe_s$")
+    plt.ylabel("value of constant")
+    plt.axhline(D_eff_noflow, color='black', linestyle='--', label='no flow', alpha=0.5)
+    plt.axhline(Ps, color='black', linestyle='dotted', label='$Pe_s$', alpha=0.5)
+    plt.legend(loc='upper right')
+    
     plt.tight_layout()
     plt.show()
 
