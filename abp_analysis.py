@@ -419,12 +419,12 @@ def TTD(filename):
 def TTD3(filename1, filename2, filename3):
     """
     Plot the trapping time distributions for the upstream ballistic, downstream 
-    ballistic, and diffusive regimes on one graph.
+    ballistic, and diffusive regimes (or whatever else is being measured) on one graph.
     
     Arguments:
-        filename1: filepath to diffusive data
-        filename2: filepath to downstream ballistic data
-        filename3: filepath to upstream ballistic data
+        filename1: filepath to first dataset
+        filename2: filepath to second dataset
+        filename3: filepath to third dataset
     """
     # Select number of bins
     num_bins = 'auto'
@@ -472,7 +472,7 @@ def TTD3(filename1, filename2, filename3):
 
     # Plot results
     fig = plt.figure(figsize=[8, 6])
-    plt.title(f"Trapping time distribution: $l_p/w$ = {lp_w}, $G$ = {G}")
+    plt.title(f"Trapping time distribution: $l_p/w$ = {lp_w}, $G$ = {G}, no vorticity")
     plt.scatter(bin_centres1, counts1, color='red', marker='.', s=10, label=f'$Pe_f/Pe_s$ = {Ps_Pf1}')
     plt.scatter(bin_centres2, counts2, color='green', marker='.', s=10, label=f'$Pe_f/Pe_s$ = {Ps_Pf2}')
     plt.scatter(bin_centres3, counts3, color='blue', marker='.', s=10, label=f'$Pe_f/Pe_s$ = {Ps_Pf3}')

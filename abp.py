@@ -18,7 +18,7 @@ plt.rcParams['text.usetex'] = False
 # Developer tools ;)
 d = 2
 tau = 1 / (d - 1)
-vorticity = 1
+vorticity = 0
 noise_r = 1
 use_arrows = False
 centre_start = False
