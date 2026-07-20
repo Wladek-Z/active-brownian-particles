@@ -19,7 +19,6 @@ noise_r = 1
 use_arrows = False
 centre_start = False
 show_traps = False
-fptd_start = False
 
 @njit
 def run(N, p, e, T, dt, Ps, D, Pf, G):
@@ -152,6 +151,27 @@ def positions(N):
     return r
 
 @njit
+def positions_fptd(N):
+    """
+    Generate the positions of N particles along a vertical strip at x = 0.
+    
+    Arguments:
+        N: number of particles
+    
+    Returns:
+        r: positions of each particle
+    """
+    y_min = 0
+    y_max = 1
+    # Initialise positions
+    r = np.zeros((N, 2))
+    # Randomly choose x and y components within specified range
+    for i in range(N):
+        r[i, 1] = random.uniform(y_min, y_max)
+    # Return position array
+    return r
+
+@njit
 def trapping_times(y, orient, N, dt):
     """
     Get array of trapping times.
@@ -230,7 +250,7 @@ class ABP:
     An ensemble of active Brownian particles experiencing Poisseuille flow in a confined geometry.
     """
 
-    def __init__(self, N, T, dt, Ps, D, Pf, G):
+    def __init__(self, N, T, dt, Ps, D, Pf, G, fptd):
         """
         Initialise N realisations of the same particle at the origin with random orientations.
         
@@ -242,7 +262,7 @@ class ABP:
             D: diffusion number
             Pf: flow Peclet number
             G: geometrical elongation factor   
-            m: trapping time method     
+            fptd: select true if collecting fptd data
         """
         # Initialise variables
         self.N = N
@@ -260,8 +280,8 @@ class ABP:
         if centre_start:
             self.r = np.full((N, 2), [0, 0.5])
             self.e = np.full((N, 2), [1/np.sqrt(2), 1/np.sqrt(2)])
-        elif fptd_start:
-            self.r = np.full((N, 2), [0, 0.5])
+        elif fptd:
+            self.r = positions_fptd(N)
         else:
             self.r = positions(N)
         
@@ -276,7 +296,7 @@ class ABP:
         """
         # Run simulation and retrieve data
         pos, orient = run(self.N, self.r, self.e, self.T, self.dt, self.Ps, self.D, self.Pf, self.G)
-        return pos, orient        
+        return pos, orient       
 
     def get_MSD(self, data):
         """
@@ -390,7 +410,7 @@ class ABP:
         if a < 1.5:
             plt.text(10*tau, 0.75*msd_fit_10, r'$\alpha$ = ' + f'{np.round(a, 2)}\n' + r'$D_{\mathrm{eff}}$ = ' + f'{np.round(B/2/d, 2)}', ha='left', va='top', fontsize=12)
         else:
-            plt.text(10*tau, 0.75*msd_fit_10, r'$\alpha$ = ' + f'{np.round(a, 2)}', ha='left', va='top', fontsize=12)
+            plt.text(10*tau, 0.75*msd_fit_10, r'$\alpha$ = ' + f'{np.round(a, 2)}\n' + r'$Pe_{s,\mathrm{eff}}$ = ' + f'{np.round(np.sqrt(B), 2)}', ha='left', va='top', fontsize=12)
         plt.legend(loc='upper left')
 
         # Calculate MSD in the x-direction and line of best fit fit
@@ -412,9 +432,9 @@ class ABP:
         plt.xlabel("$tD_r$")
         plt.ylabel(r"$\langle (\Delta x)^2 \rangle/w^2$")
         if a_x < 1.5:
-            plt.text(10*tau, 0.75*msd_fit_10, r'$\alpha$ = ' + f'{np.round(a_x, 2)}\n' + r'$D_{\mathrm{eff}}$ = ' + f'{np.round(B_x/2/d, 2)}', ha='left', va='top', fontsize=12)
+            plt.text(10*tau, 0.75*msd_x_fit_10, r'$\alpha$ = ' + f'{np.round(a_x, 2)}\n' + r'$D_{\mathrm{eff}}$ = ' + f'{np.round(B_x/2/d, 2)}', ha='left', va='top', fontsize=12)
         else:
-            plt.text(10*tau, 0.75*msd_fit_10, r'$\alpha$ = ' + f'{np.round(a_x, 2)}', ha='left', va='top', fontsize=12)
+            plt.text(10*tau, 0.75*msd_x_fit_10, r'$\alpha$ = ' + f'{np.round(a_x, 2)}\n' + r'$Pe_{s,\mathrm{eff}}$ = ' + f'{np.round(np.sqrt(B_x), 2)}', ha='left', va='top', fontsize=12)
         plt.legend(loc='upper left')
 
         # Calculate MSD in the y-direction and line of best fit fit
@@ -550,23 +570,27 @@ class ABP:
     
     def FPTD(self, data, target):
         """
-        Obtain the first-passage time distribution for an ensemble of particles to reach a point x along the x-axis.
+        Obtain the first-passage time distribution of an ensemble of particles reaching a target along
+        the longitudinal direction.
         
         Arguments:
             data: ABP position history
-            target: distance to check for first passage
+            target: distance to check for first passage time
         """
         # Get all x positions
         x = data[:, :, 0]
         # Define condition for particle crossing the target
-        crossed = x >= target
+        if target > 0:
+            crossed = x >= target
+        else:
+            crossed = x <= target
         # Identify all particles that successfully crossed the target
         has_crossed = np.any(crossed, axis=0)
         # Obtain first crossing of each particle
         first = np.argmax(crossed, axis=0)
         # Discard all unsuccessful attempts and convert to time units
         fpt = first[has_crossed] * self.dt
-        success_rate = np.round(len(fpt) / self.N * 100, 2)
+        success_rate = np.round(len(fpt) / self.N * 100, 1)
         # Save data to file
         filename = f'fptd data/fptd_x{target}_N{self.N}_{self.Ps}_{np.round(self.Pf/self.Ps, 6)}_{self.G}.txt'
         with open(filename, 'w') as f:
@@ -785,7 +809,7 @@ class ABP:
 if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('-N', type=int, default=500, help='Number of realisations of the ABP')
+    parser.add_argument('-N', type=int, default=1, help='Number of realisations of the ABP')
     parser.add_argument('-dt', type=float, default=0.001, help='Simulation timestep')
     parser.add_argument('--MSD', action='store_true', help='Obtain the mean square displacement')
     parser.add_argument('--trajectory', action='store_true', help='Display the particle trajectory')
@@ -796,23 +820,21 @@ if __name__ == "__main__":
     parser.add_argument('-Ps', type=float, default=5, help='Swim Peclet number')
     parser.add_argument('-Pf', type=float, default=5, help='Flow Peclet number')
     parser.add_argument('-D', type=float, default=0.1, help='Dimensionless ratio of diffusion constants')
-    parser.add_argument('-x', type=float, default=20, help='Distance along x-axis to check for first-passage')
+    parser.add_argument('-x', type=float, default=10, help='Distance along x-axis to check for first-passage')
     parser.add_argument('-G', type=float, default=0, help='Geometrical factor related to particle aspect ratio')
     parser.add_argument('--init', action='store_true', help='View the initial configuration of the system')
     parser.add_argument('--TTD', action='store_true', help='Obtain the trapping time distribution')
     parser.add_argument('--DX', action='store_true', help='Display the longitudinal displacements over time')
     args = parser.parse_args()
 
-    if args.FPTD:
-        fptd_start = True
+    abp = ABP(args.N, args.T, args.dt, args.Ps, args.D, args.Pf, args.G, args.FPTD)
 
-    abp = ABP(args.N, args.T, args.dt, args.Ps, args.D, args.Pf, args.G)
-
+    # Display initial configuration
     if args.init:
         abp.initial_config()
-
+    # Run simulation
     pos, orient = abp.Run()
-
+    # Perform select statistics
     if args.trajectory:
         abp.Trajectory(pos, orient)
     if args.DX:

@@ -21,36 +21,28 @@ def phase_diagram(filename):
     Arguments:
         filename: file to stored data
     """
+    # Read parameters
+    with open(filename, 'r') as f:
+        line1 = f.readline().strip()
+        G = float(line1.split("=")[1])
     # Read in and interpret data
-    lp_w, Pf_Ps, a, b, trap_frac, mean_vx = np.loadtxt(filename, delimiter=',', skiprows=1, unpack=True)
+    lp_w, Pf_Ps, a, b, mean_vx = np.loadtxt(filename, delimiter=',', skiprows=2, unpack=True)
     nlp_w, nPf_Ps = np.unique(lp_w), np.unique(Pf_Ps)
     size_x = len(nlp_w)
     size_y = len(nPf_Ps)
     A = a.reshape(size_x, size_y).T
     B = b.reshape(size_x, size_y).T
-    TF = trap_frac.reshape(size_x, size_y).T
     VX = mean_vx.reshape(size_x, size_y).T
     X, Y = np.meshgrid(nlp_w, nPf_Ps)
-
-    # Define custom colormap
-    #colours = ['blue', 'white', 'red']
-    #cmap = colors.ListedColormap(colours)
-    #vmin = np.min(A)
-    #vmax = np.max(A)
-    #boundaries = np.array([np.round(vmin, 2), 1.2, 1.8, np.round(vmax, 2)])
-    #norm_a = colors.BoundaryNorm(boundaries, cmap.N)
 
     # Normalise divergent colormap
     norm_a = colors.TwoSlopeNorm(vmin=A.min(), vcenter=1.5, vmax=A.max())
 
     # Plot MSD scaling exponent
     fig = plt.figure(figsize=[8, 6])
-    plt.title("MSD$_x$ scaling exponent")
+    plt.title(f"MSD$_x$ scaling exponent: $G$ = {G}")
     plt.pcolormesh(X, Y, A, cmap='bwr', norm=norm_a, shading='auto')
-    #cbar = plt.colorbar(label=r'$\alpha$', boundaries=boundaries, spacing='proportional')
     plt.colorbar(label=r'$\alpha$')
-    #cbar.set_ticks(boundaries)
-    #cbar.set_ticklabels(boundaries)
     plt.xlabel("$l_p/w$")
     plt.ylabel("$Pe_f/Pe_s$")
 
@@ -59,7 +51,7 @@ def phase_diagram(filename):
 
     # Plot mean longitudinal velocity
     fig = plt.figure(figsize=[8, 6])
-    plt.title("Mean longitudinal velocity")
+    plt.title(f"Mean longitudinal velocity: $G$ = {G}")
     plt.pcolormesh(X, Y, VX, cmap='bwr', shading='auto', norm=norm_vx)
     plt.colorbar(label=r'$\langle v_x \rangle/wD_r$')
     plt.xlabel("$l_p/w$")
@@ -70,7 +62,7 @@ def phase_diagram(filename):
 
     # Plot variance of displacement
     fig = plt.figure(figsize=[8, 6])
-    plt.title(r"Var($\Delta x$) scaling exponent")
+    plt.title(r"Var($\Delta x$) scaling exponent: " + f'$G$ = {G}')
     plt.pcolormesh(X, Y, B, cmap='bwr', shading='auto', norm=norm_var)
     cbar = plt.colorbar(label=r'$\beta$', spacing='proportional')
     plt.xlabel("$l_p/w$")
@@ -441,8 +433,12 @@ def TTD(filename):
         line3 = f.readline().strip()
         G = float(line3.split("=")[1])
         tt = np.loadtxt(f)
-    # Construct logarithmic trapping time distribution
-    bin_centres, counts, bins = TD_logbin(tt[tt>0.1], 200)
+
+    # Filter data 
+    data = tt[tt > 0.1]
+    # Construct histogram
+    counts, bins = np.histogram(data, bins=200, density=True)
+    bin_centres = (bins[:-1] + bins[1:]) / 2
 
     # Perform curve fit
     #popt, pcov = curve_fit(func, bin_centres, counts)
@@ -456,12 +452,12 @@ def TTD(filename):
     plt.title(f"$l_p/w$ = {lp_w}, $Pe_f/Pe_s$ = {Ps_Pf}, $G$ = {G}")
     #plt.plot(tfit, yfit, color='magenta', label=r'$Ae^{\gamma T} + Be^{-\zeta T}$')
     plt.xlabel("$tD_r$")
-    plt.ylabel("% counts")
-    plt.xscale('log')
+    plt.ylabel("probability density")
+    #plt.xscale('log')
     plt.yscale('log')
-    plt.axvline(tau, color='black', linestyle='dotted', label=r'$T=\tau_r$')
+    plt.axvline(tau, color='black', linestyle='dotted', label=r'$t=\tau_r$')
     #plt.text(tfit[3*len(tfit)//4], 0.75*yfit[3*len(tfit)//4], r'$\gamma$ = ' + f'{np.round(popt[2], 2)}\n' + r'$\zeta$ = ' + f'{np.round(popt[3], 2)}',  ha='left', va='bottom', fontsize=12)
-    plt.legend(loc='lower left')
+    plt.legend(loc='upper right')
     
     plt.tight_layout()
     plt.show()
@@ -476,6 +472,8 @@ def TTD3(filename1, filename2, filename3):
         filename2: filepath to downstream ballistic data
         filename3: filepath to upstream ballistic data
     """
+    # Select number of bins
+    num_bins = 'auto'
     # Read parameters and trapping times from first datafile
     with open(filename1, 'r') as f:
         line1 = f.readline().strip()
@@ -486,8 +484,11 @@ def TTD3(filename1, filename2, filename3):
         G = float(line3.split("=")[1])
         tt1 = np.loadtxt(f)
 
-    # Construct logarithmic trapping time distribution
-    bin_centres1, counts1, _ = TD_logbin(tt1[tt1>0.1], 200)
+    # Filter data 
+    data1 = tt1[tt1 > 0.1]
+    # Construct histogram
+    counts1, bins = np.histogram(data1, bins=num_bins, density=True)
+    bin_centres1 = (bins[:-1] + bins[1:]) / 2
 
     # Get parameters and trapping times from second datafile
     with open(filename2, 'r') as f:
@@ -495,8 +496,12 @@ def TTD3(filename1, filename2, filename3):
         line2 = f.readline().strip()
         Ps_Pf2 = float(line2.split("=")[1])
         tt2 = np.loadtxt(f)
-    # Construct logarithmic trapping time distribution
-    bin_centres2, counts2, _ = TD_logbin(tt2[tt2>0.1], 200)
+    
+    # Filter data 
+    data2 = tt2[tt2 > 0.1]
+    # Construct histogram
+    counts2, bins = np.histogram(data2, bins=num_bins, density=True)
+    bin_centres2 = (bins[:-1] + bins[1:]) / 2
 
     # Get parameters and trapping times from third datafile
     with open(filename3, 'r') as f:
@@ -504,21 +509,25 @@ def TTD3(filename1, filename2, filename3):
         line2 = f.readline().strip()
         Ps_Pf3 = float(line2.split("=")[1])
         tt3 = np.loadtxt(f)
-    # Construct logarithmic trapping time distribution
-    bin_centres3, counts3, _ = TD_logbin(tt3[tt3>0.1], 200)
+    
+    # Filter data 
+    data3 = tt3[tt3 > 0.1]
+    # Construct histogram
+    counts3, bins = np.histogram(data3, bins=num_bins, density=True)
+    bin_centres3 = (bins[:-1] + bins[1:]) / 2
 
     # Plot results
     fig = plt.figure(figsize=[8, 6])
-    plt.title(f"Flow-strength comparison: $l_p/w$ = {lp_w}, $G$ = {G}")
+    plt.title(f"Trapping time distribution: $l_p/w$ = {lp_w}, $G$ = {G}")
     plt.scatter(bin_centres1, counts1, color='red', marker='.', s=10, label=f'$Pe_f/Pe_s$ = {Ps_Pf1}')
     plt.scatter(bin_centres2, counts2, color='green', marker='.', s=10, label=f'$Pe_f/Pe_s$ = {Ps_Pf2}')
     plt.scatter(bin_centres3, counts3, color='blue', marker='.', s=10, label=f'$Pe_f/Pe_s$ = {Ps_Pf3}')
     plt.xlabel("$tD_r$")
-    plt.ylabel("% counts")
-    plt.xscale('log')
+    plt.ylabel("probability density")
+    #plt.xscale('log')
     plt.yscale('log')
-    plt.axvline(tau, color='black', linestyle='dotted', label=r'$T=\tau_r$')
-    plt.legend(loc='lower left')
+    plt.axvline(tau, color='black', linestyle='dotted', label=r'$t=\tau_r$')
+    plt.legend(loc='upper right')
     
     plt.tight_layout()
     plt.show()
@@ -543,17 +552,19 @@ def FPTD(filename):
         success_rate = float(line5.split("=")[1])
         fpt = np.loadtxt(f)
 
-    # Logbin the FPTD data
-    bin_centres, counts, bins = TD_logbin(fpt, len(fpt)//10)
+    # Construct histogram
+    num_bins = 'auto'
+    counts, bins = np.histogram(fpt, bins=num_bins, density=True)
+    bin_centres = (bins[:-1] + bins[1:]) / 2
 
     # Build histogram of the FPTD
     fig = plt.figure(figsize=[8, 6])
-    plt.scatter(bin_centres, counts, color='black', marker='.', s=10)
-    plt.title(f"$l_p/w$ = {lp_w}, $Pe_f/Pe_s$ = {Ps_Pf}, $G$ = {G}, Target = {target}$/w$, Success Rate = {success_rate}%")
+    plt.scatter(bin_centres, counts, color='black', marker='.', s=20)
+    #plt.stairs(counts, bins, color='black')
+    plt.title(f"FPTD: $l_p/w$ = {lp_w}, $Pe_f/Pe_s$ = {Ps_Pf}, $G$ = {G}, $x_T/w$ = {target}, success rate = {success_rate}%")
     plt.xlabel("$tD_r$")
-    plt.xscale('log')
+    plt.ylabel("probability density")
     plt.yscale('log')
-    plt.ylabel("% counts")
 
     plt.tight_layout()
     plt.show()
