@@ -7,6 +7,10 @@ from scipy.stats import binned_statistic
 from scipy.optimize import curve_fit
 import argparse
 import random
+from pathlib import Path
+import sys
+
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 plt.style.use('science')
 plt.rcParams['text.usetex'] = False
