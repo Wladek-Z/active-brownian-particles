@@ -9,6 +9,4 @@
 #######################################
 
 source .venv/bin/activate
-python ../abp.py -Ps 1.5 -Pf 2.25 -N 2000 -G 1 --FPTD -T 200000
-python ../abp.py -Ps 1.5 -Pf 2.625 -N 2000 -G 1 --FPTD -T 200000
-python ../abp.py -Ps 1.5 -Pf 3 -N 2000 -G 1 --FPTD -T 200000
+python abp_simulation.py -Ps 1.5 --eff -f eff_n32_1.5_1.npz -N 1000 -G 1 -l1 0.125 -u1 2 -n 32
