@@ -216,4 +216,4 @@ if __name__ == "__main__":
     elif args.hist:
         collect_histogram(args.F, args.N, args.T, args.dt, args.Ps, args.D, args.Pf, args.G, args.bins)
     elif args.eff:
-        effective_constants(args.f, args.N, args.T, args.dt, args.Ps, args.D, args.G, args.l, args.u, args.n)
+        effective_constants(args.f, args.N, args.T, args.dt, args.Ps, args.D, args.G, args.l1, args.u1, args.n)
