@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import scienceplots
 from scipy.stats import uniform_direction
 import argparse
+from scipy.stats import binned_statistic
 
 plt.style.use('science')
 plt.rcParams['text.usetex'] = False
@@ -357,119 +358,169 @@ class ABP:
         return theta_blk, theta_sfc
 
 
-    def PDF(self, p, o):
+    def PDF(self, pos, orient):
         """
         Obtain the probability density functions in both positional and
         orientational space.
 
         Arguments:
-            p: position data
-            o: orientation data
+            pos: position data
+            orient: orientation data
         """
+        # Select number of bins
+        num_bins = 'auto'
+        # Decorrelate position and orientation data
+        p = pos[::self.step][10:-1]
+        o = orient[::self.step][10:-1]
+        # Get independent velocity data
+        vx = self.get_xspeed(pos)
+        vx_independent = vx[::self.step][10:]
+        
+        
         # Isolate vertical position from position data
-        y = p[:, :, 1].flatten() / self.width
+        y = p[:, :, 1].flatten()
 
-        # Construct positional PDF
-        pdf1, edges1 = np.histogram(y, bins=100, density=True)
-        x1 = 0.5 * (edges1[:-1] + edges1[1:])
+        # Construct spatial PDF
+        pdf1, edges1 = np.histogram(y, bins=num_bins, density=True)
 
-        fig = plt.figure(figsize=[8, 6])
-        plt.plot(x1, pdf1, color='black')
-        plt.title(f"Spatial distribution of ABPs: " + r"Pe$_{\mathrm{s}}$ = " + f"{self.Ps}, " + r"Pe$_{\mathrm{f}}$ = " + f"{self.Pf}")
-        plt.xlabel("height along channel, $y/w$")
-        plt.ylabel("probability density, $P(y/w)$")
-        plt.xlim(0, 1)
+        # Find average velocity at each section along channel width
+        mean_vx, _, _ = binned_statistic(y, vx_independent.flatten(), statistic='mean', bins=edges1)
+        bin_centres = 0.5 * (edges1[:-1] + edges1[1:])
+
+        fig, ax1 = plt.subplots(figsize=[8, 6])
+        ax1.stairs(pdf1, edges1, color='black')
+        ax1.set_title(f"Spatial PDF: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
+        ax1.set_xlabel("$y/w$")
+        ax1.set_ylabel("$P(y/w)$")
+        ax1.set_xlim(0, 1)
+
+        ax2 = ax1.twinx()  # instantiate a second Axes that shares the same x-axis
+
+        color = 'tab:green'
+        ax2.set_ylabel(r'$\langle v_x \rangle/v_0$', color=color)
+        ax2.plot(bin_centres, mean_vx/self.Ps, color=color)
+        ax2.tick_params(axis='y', labelcolor=color)
         plt.tight_layout()
 
         # Isolate orientation angles from orientation data
-        theta = np.arctan2(o[:, :, 1].flatten(), o[:, :, 0].flatten())
+        theta = np.arctan2(o[:, :, 1], o[:, :, 0]).flatten()
+
+        # Find average orientation at each section along channel width
+        mean_theta, _, _ = binned_statistic(y, theta, statistic='mean', bins=edges1)
+
+        # Plot spatial PDF with average orientation overlaid
+        fig, ax1 = plt.subplots(figsize=[8, 6])
+        ax1.stairs(pdf1, edges1, color='black')
+        ax1.set_title(f"Spatial PDF: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
+        ax1.set_xlabel("$y/w$")
+        ax1.set_ylabel("$P(y/w)$")
+        ax1.set_xlim(0, 1)
+
+        ax2 = ax1.twinx()  # instantiate a second Axes that shares the same x-axis
+
+        color = 'tab:red'
+        ax2.set_ylabel(r'$\langle \theta \rangle$', color=color)  # we already handled the x-label with ax1
+        ax2.plot(bin_centres, mean_theta, color=color)
+        ax2.tick_params(axis='y', labelcolor=color)
+        ax2.set_yticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
+        plt.tight_layout()
 
         # Construct orientational PDF
-        pdf2, edges2 = np.histogram(theta, bins=100, density=True)
-        x2 = 0.5 * (edges2[:-1] + edges2[1:])
+        pdf2, edges2 = np.histogram(theta, bins=num_bins, density=True)
 
         fig = plt.figure(figsize=[8, 6])
-        plt.plot(x2, pdf2, color='black')
-        plt.title("Orientational distribution of ABPs: " + r"Pe$_{\mathrm{s}}$ = " + f"{self.Ps}, " + r"Pe$_{\mathrm{f}}$ = " + f"{self.Pf}")
-        plt.xlabel(r"orientation angle, $\theta$")
-        plt.ylabel(r"probability density, $P(\theta)$")
+        plt.stairs(pdf2, edges2, color='black')
+        plt.title(f"Orientational PDF: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
+        plt.xlabel(r"$\theta$")
+        plt.ylabel(r"$P(\theta)$")
         plt.xlim(-np.pi, np.pi)
         plt.xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
         plt.tight_layout()
 
-        # Calculate orientation angles in the bulk and near the surface
-        theta_blk_o, theta_sfc_o = self.blk_sfc_orient(p, theta)
-        # Construct PDF showing the distribution of swimming direction in the bulk
-        pdf3, edges3 = np.histogram(theta_blk_o, bins=100, density=True)
-        x3 = 0.5 * (edges3[:-1] + edges3[1:])
+        # Find particle orientations near the surface for upstream swimmers
+        trap = self.trapping_index(p, vx_independent)
+        theta_trap = theta[trap.flatten()]
+
+        # Construct orientational PDF near the surface for upstream swimmers
+        pdf3, edges3 = np.histogram(theta_trap, bins=num_bins, density=True)
 
         fig = plt.figure(figsize=[8, 6])
-        plt.plot(x3, pdf3, color='black')
-        plt.title("Orientational distribution (bulk): " + r"Pe$_{\mathrm{s}}$ = " + f"{self.Ps}, " + r"Pe$_{\mathrm{f}}$ = " + f"{self.Pf}")
-        plt.xlabel(r"orientation angle, $\theta$")
-        plt.ylabel(r"probability density, $P(\theta)$")
+        plt.stairs(pdf3, edges3, color='black')
+        plt.title(f"Orientational PDF (trapped): $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
+        plt.xlabel(r"$\theta$")
+        plt.ylabel(r"$P(\theta)$")
         plt.xlim(-np.pi, np.pi)
         plt.xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
         plt.tight_layout()
 
-        # Construct PDF showing the distribution of swimming direction in the bulk
-        pdf4, edges4 = np.histogram(theta_sfc_o, bins=100, density=True)
-        x4 = 0.5 * (edges4[:-1] + edges4[1:])
+        # Find particle orientations near the surface
+        wall = self.wall_index(p)
+        theta_wall = theta[wall.flatten()]
+
+        # Construct orientational PDF near the surface 
+        pdf4, edges4 = np.histogram(theta_wall, bins=num_bins, density=True)
 
         fig = plt.figure(figsize=[8, 6])
-        plt.plot(x4, pdf4, color='black')
-        plt.title("Orientational distribution (surface): " + r"Pe$_{\mathrm{s}}$ = " + f"{self.Ps}, " + r"Pe$_{\mathrm{f}}$ = " + f"{self.Pf}")
-        plt.xlabel(r"orientation angle, $\theta$")
-        plt.ylabel(r"probability density, $P(\theta)$")
+        plt.stairs(pdf4, edges4, color='black')
+        plt.title(f"Orientational PDF (wall): $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
+        plt.xlabel(r"$\theta$")
+        plt.ylabel(r"$P(\theta)$")
         plt.xlim(-np.pi, np.pi)
         plt.xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
         plt.tight_layout()
 
-        # Calculate angles of velocity vectors
-        vx = self.get_xspeed(p)
-        vy = self.get_yspeed(p)
-        theta_v = np.arctan2(vy.flatten(), vx.flatten())
-        # Construct PDF showing the distribution of swimming direction
-        pdf5, edges5 = np.histogram(theta_v, bins=100, density=True)
-        x5 = 0.5 * (edges5[:-1] + edges5[1:])
+        # Find particle orientations in the bulk
+        theta_bulk = theta[~wall.flatten()]
+
+        # Construct orientational PDF in the bulk
+        pdf5, edges5 = np.histogram(theta_bulk, bins=num_bins, density=True)
 
         fig = plt.figure(figsize=[8, 6])
-        plt.plot(x5, pdf5, color='black')
-        plt.title("Swimming direction distribution: " + r"Pe$_{\mathrm{s}}$ = " + f"{self.Ps}, " + r"Pe$_{\mathrm{f}}$ = " + f"{self.Pf}")
-        plt.xlabel(r"swimming direction, $\theta_{\mathrm{s}}$")
-        plt.ylabel(r"probability density, $P(\theta_{\mathrm{s}})$")
+        plt.stairs(pdf5, edges5, color='black')
+        plt.title(f"Orientational PDF (bulk): $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
+        plt.xlabel(r"$\theta$")
+        plt.ylabel(r"$P(\theta)$")
         plt.xlim(-np.pi, np.pi)
         plt.xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
         plt.tight_layout()
 
-        # Calculate swimming angles in the bulk and near the surface
-        theta_blk_s, theta_sfc_s = self.blk_sfc_swim(p, theta_v)
-        # Construct PDF showing the distribution of swimming direction in the bulk
-        pdf6, edges6 = np.histogram(theta_blk_s, bins=100, density=True)
-        x6 = 0.5 * (edges6[:-1] + edges6[1:])
+        plt.show()
 
+    def Displacements(self, pos, orient):
+        """
+        Display the longitudinal displacements for the trajectory of a single ABP over time.
+        
+        Arguments:
+            pos: position history
+        """
+        # Calculate instantaneous displacements
+        dx = np.append([0], pos[1:, 0, 0] - pos[:-1, 0, 0]).flatten()
+        t = np.linspace(0, self.T * self.dt, self.T + 1)
+
+        
         fig = plt.figure(figsize=[8, 6])
-        plt.plot(x6, pdf6, color='black')
-        plt.title("Swimming direction distribution (bulk): " + r"Pe$_{\mathrm{s}}$ = " + f"{self.Ps}, " + r"Pe$_{\mathrm{f}}$ = " + f"{self.Pf}")
-        plt.xlabel(r"swimming direction, $\theta_{\mathrm{s}}$")
-        plt.ylabel(r"probability density, $P(\theta_{\mathrm{s}})$")
-        plt.xlim(-np.pi, np.pi)
-        plt.xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
+        plt.title(f"Longitudinal displacements: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
+        plt.xlabel("$tD_r$")
+        plt.ylabel(r"$\Delta x(t)/w$")
+        plt.scatter(t, dx, color='black', s=1, marker='.', zorder=-1)
+
+        if show_traps:
+            # Calculate orientation angles
+            ex, ey = orient[:, 0, 0], orient[:, 0, 1]
+            theta = np.arctan2(ey, ex)
+            idx_s, idx_e, _ = track_traps(pos[:, 0, 1], self.dt, theta)
+            
+            plt.axvline(t[idx_s][0], color='blue', label='start')
+            for T in t[idx_s][1:]:
+                plt.axvline(T, color='blue')
+            plt.axvline(t[idx_e][0], color='orange', label='end')
+            for T in t[idx_e][1:]:
+                plt.axvline(T, color='orange')
+
+        plt.axvline(tau, color='black', linestyle='dotted', label=r'$t=\tau_r$')
+        plt.legend(loc='lower right')
+        
         plt.tight_layout()
-
-        # Construct PDF showing the distribution of swimming direction in the bulk
-        pdf7, edges7 = np.histogram(theta_sfc_s, bins=100, density=True)
-        x7 = 0.5 * (edges7[:-1] + edges7[1:])
-
-        fig = plt.figure(figsize=[8, 6])
-        plt.plot(x7, pdf7, color='black')
-        plt.title("Swimming direction distribution (surface): " + r"Pe$_{\mathrm{s}}$ = " + f"{self.Ps}, " + r"Pe$_{\mathrm{f}}$ = " + f"{self.Pf}")
-        plt.xlabel(r"swimming direction, $\theta_{\mathrm{s}}$")
-        plt.ylabel(r"probability density, $P(\theta_{\mathrm{s}})$")
-        plt.xlim(-np.pi, np.pi)
-        plt.xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
-        plt.tight_layout()
-
         plt.show()
 
 

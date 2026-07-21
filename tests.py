@@ -1,4 +1,5 @@
 import numpy as np
 
-x = np.linspace(0.125, 2, 16) * 1.5
-print(x)
+x = np.linspace(0.25, 2, 8)
+print(x[x == 0.25])
+print(x[~(x == 0.25)])

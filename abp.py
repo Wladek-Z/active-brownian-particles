@@ -66,13 +66,13 @@ def run(N, p, e, T, dt, Ps, D, Pf, G):
     return p_hist, o_hist   
 
 @njit
-def update(N, p, e, dt, Ps, D, Pf, G):
+def update(N, r, e, dt, Ps, D, Pf, G):
         """
         Update the positions and orientations of each particle.
         
         Arguments:
             N: number of particles
-            p: particle positions
+            r: particle positions
             e: particle orientations
             dt: timestep
             Ps: swim Peclet number
@@ -84,25 +84,25 @@ def update(N, p, e, dt, Ps, D, Pf, G):
             r_new: updated positions
             e_new: updated orientations
         """
-        p_new = np.zeros_like(p)
+        r_new = np.zeros_like(r)
         e_new = np.zeros_like(e)
         # Iterate over every particle
         for i in range(N):
             # Compute swim velocity term
-            p_swim = dt * Ps * e[i] 
+            r_swim = dt * Ps * e[i] 
             # Generate translational noise term
-            p_noise = np.sqrt(2 * dt) * D * np.random.normal(0, 1, 2) 
+            r_noise = np.sqrt(2 * D * dt) * np.random.normal(0, 1, 2) 
             # Update position via forward difference scheme
-            p_new[i] = p[i] + p_swim + p_noise
+            r_new[i] = r[i] + r_swim + r_noise
             # Incorporate correction due to fluid flow
-            p_new[i, 0] += 4 * dt * Pf * p[i, 1] * (1 - p[i, 1]) 
+            r_new[i, 0] += 4 * dt * Pf * r[i, 1] * (1 - r[i, 1]) 
             # Impose reflection at boundaries
-            if p_new[i, 1] < 0 or p_new[i, 1] > 1:
-                p_new[i, 1] = p[i, 1]
+            if r_new[i, 1] < 0 or r_new[i, 1] > 1:
+                r_new[i, 1] = r[i, 1]
             # Update orientation
-            e_new[i] = orientation(e[i], dt, Pf, p_new[i, 1], G)
+            e_new[i] = orientation(e[i], dt, Pf, r_new[i, 1], G)
         # Return updated position and orientation vectors
-        return p_new, e_new
+        return r_new, e_new
 
 @njit
 def orientation(e, dt, Pf, y, G):
@@ -388,10 +388,10 @@ class ABP:
         # Create array of measurement times
         t = np.arange(1, self.T + 1) * self.dt
         # Theoretical mean square displacement
-        msd_theory = 2 * d * self.D**2 * t + 2 * self.Ps**2 * tau * t - 2 * self.Ps**2 * tau**2 * (1 - np.exp(-t / tau))
+        msd_theory = 2 * d * self.D * t + 2 * self.Ps**2 * tau * t - 2 * self.Ps**2 * tau**2 * (1 - np.exp(-t / tau))
         # Theoretical msd for ballistic and diffusive regimes
-        msd_b = self.Ps**2 * t**2 + 2 * d * self.D**2 * t
-        msd_d = 2 * t * (d * self.D**2 + self.Ps**2 * tau)
+        msd_b = self.Ps**2 * t**2 + 2 * d * self.D * t
+        msd_d = 2 * t * (d * self.D + self.Ps**2 * tau)
         # Perform fit to late-time data
         a, b = self.get_powerlaw(msd)
         B = np.exp(b)
@@ -402,7 +402,7 @@ class ABP:
 
         # Plot MSD with fit and theory lines
         fig = plt.figure(figsize=[8, 6])
-        plt.title(f"MSD: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
+        plt.title(f"MSD: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
         plt.scatter(t, msd, color='black', marker='.', s=10, label='simulation')
         plt.loglog(t, msd_theory, color='red', linestyle='--', label='theory')
         plt.loglog(t, msd_b, color='blue', linestyle='--', label='ballistic')
@@ -427,7 +427,7 @@ class ABP:
         msd_x_fit_10 = B_x * (10*tau)**a_x
 
         fig = plt.figure(figsize=[8, 6])
-        plt.title(f"MSD$_x$: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
+        plt.title(f"MSD$_x$: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
         plt.scatter(t, msd_x, color='black', marker='.', s=10, label='simulation')
         plt.loglog(t, msd_theory/2, color='red', linestyle='--', label='theory')
         plt.loglog(t, msd_b/2, color='blue', linestyle='--', label='ballistic')
@@ -452,7 +452,7 @@ class ABP:
         msd_y_fit_10 = B_y * (10*tau)**a_y
 
         fig = plt.figure(figsize=[8, 6])
-        plt.title(f"MSD$_y$: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
+        plt.title(f"MSD$_y$: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
         plt.scatter(t, msd_y, color='black', marker='.', s=10, label='simulation')
         plt.loglog(t, msd_theory/2, color='red', linestyle='--', label='theory')
         plt.loglog(t, msd_b/2, color='blue', linestyle='--', label='ballistic')
@@ -500,26 +500,22 @@ class ABP:
         t_fit = np.linspace(tau/self.dt, self.T, 100) * self.dt
         var_fit = np.exp(b) * t_fit**a
         # Calculate diffusivity
-        D_fit = np.round(np.exp(b) / 2, 2)
+        D_eff = np.round(np.exp(b) / 2 / d, 2)
         # Calculate theoretical (diffusive) variance
-        var_theory = 2 * self.D * t
-        # Calculate variance at t = 10*tau
+        var_theory = 2 * d * (self.D + tau * self.Ps**2 / 2 / d) * t
+        # Calculate variance at t = 10tau
         var_fit_10 = np.exp(b) * (10*tau)**a
 
         # Plot variance with fit, display parameters
         fig = plt.figure(figsize=[8, 6])
-        plt.title(r"Var($\Delta x$): $l_p/w$ = " + f"{self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
+        plt.title(r"Var($\Delta x$): $l_p/w$ = " + f"{self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
         plt.scatter(t, var, color='black', marker='.', s=10, label='simulation')
-        plt.loglog(t, var_theory, color='red', linestyle='--', label='2$Dt$')
+        plt.loglog(t, var_theory, color='red', linestyle='--', label=r'$\sim t$')
         plt.loglog(t_fit, var_fit, color='magenta', label=r'$\sim t^{\beta}$')
         plt.xlabel("$tD_r$")
         plt.ylabel(r"$\langle (\Delta x - \langle \Delta x \rangle)^2 \rangle/w^2$")
         plt.axvline(tau, color='black', linestyle='dotted', label=r'$t=\tau_r$')
-        # Only display fitted diffusivity if motion is late-time diffusive (beta < 1.2)
-        if a < 1.2:
-            plt.text(10*tau, 0.75*var_fit_10, r'$\beta$ = ' + f'{np.round(a, 2)}\n' + r'$D_{\mathrm{fit}}$ = ' + f'{D_fit}', ha='left', va='top', fontsize=12)
-        else:
-            plt.text(10*tau, 0.75*var_fit_10, r'$\beta$ = ' + f'{np.round(a, 2)}', ha='left', va='top')
+        plt.text(10*tau, 0.75*var_fit_10, r'$\beta$ = ' + f'{np.round(a, 2)}\n' + r'$D_{\mathrm{eff}}$ = ' + f'{D_eff}', ha='left', va='top', fontsize=12)
         plt.legend(loc='upper left')
 
         plt.tight_layout()
@@ -539,19 +535,19 @@ class ABP:
         x, y = data[:, 0, 0], data[:, 0, 1]
         start_x, start_y = data[0, 0, 0], data[0, 0, 1]
         end_x, end_y = data[-1, 0, 0], data[-1, 0, 1]
+        # Calculate orientation angles
+        dx, dy = data1[:, 0, 0], data1[:, 0, 1]
+        theta = np.arctan2(dy, dx)
 
         # Plot regular trajectory with optional traps
         fig = plt.figure(figsize=[8, 6])
-        plt.title(f"Trajectory: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
+        plt.title(f"Trajectory: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
 
         # Show start and end points of trajectory
         plt.scatter(start_x, start_y, color='lime', s=20, zorder=1)
         plt.scatter(end_x, end_y, color='red', s=20, zorder=1)
 
         if show_traps:
-            # Calculate orientation angles
-            dx, dy = data1[:, 0, 0], data1[:, 0, 1]
-            theta = np.arctan2(dy, dx)
             idx_s, idx_e, _ = track_traps(y, self.dt, theta)
             # Show traps
             plt.scatter(x[idx_s], y[idx_s], color='cyan', s=15, zorder=1)
@@ -567,7 +563,7 @@ class ABP:
 
         # Show trajectory with orientation directions overlaid
         fig = plt.figure(figsize=[8, 6])
-        plt.title(f"Trajectory: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
+        plt.title(f"Trajectory: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
         
         # Show start and end points
         plt.scatter(start_x, start_y, color='lime', s=20, zorder=1)
@@ -623,7 +619,6 @@ class ABP:
             f.write(f"# target = {target}\n")
             f.write(f"# success rate = {success_rate}\n")
             np.savetxt(f, fpt)
-
 
     def initial_config(self):
         """
@@ -685,21 +680,21 @@ class ABP:
             pos: position data
             orient: orientation data
         """
+        # Select number of bins
+        num_bins = 'auto'
         # Decorrelate position and orientation data
         p = pos[::self.step][10:-1]
         o = orient[::self.step][10:-1]
         # Get independent velocity data
         vx = self.get_xspeed(pos)
-        #vy = self.get_yspeed(pos)
         vx_independent = vx[::self.step][10:]
-        #vy_independent = vy[::self.step][10:]
-        #v = np.sqrt(vx_independent.flatten()**2 + vy_independent.flatten()**2)
+        
         
         # Isolate vertical position from position data
         y = p[:, :, 1].flatten()
 
         # Construct spatial PDF
-        pdf1, edges1 = np.histogram(y, bins=50, density=True)
+        pdf1, edges1 = np.histogram(y, bins=num_bins, density=True)
 
         # Find average velocity at each section along channel width
         mean_vx, _, _ = binned_statistic(y, vx_independent.flatten(), statistic='mean', bins=edges1)
@@ -707,7 +702,7 @@ class ABP:
 
         fig, ax1 = plt.subplots(figsize=[8, 6])
         ax1.stairs(pdf1, edges1, color='black')
-        ax1.set_title(f"Spatial PDF: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
+        ax1.set_title(f"Spatial PDF: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
         ax1.set_xlabel("$y/w$")
         ax1.set_ylabel("$P(y/w)$")
         ax1.set_xlim(0, 1)
@@ -724,12 +719,12 @@ class ABP:
         theta = np.arctan2(o[:, :, 1], o[:, :, 0]).flatten()
 
         # Find average orientation at each section along channel width
-        mean_theta, _, _ = binned_statistic(y, theta, statistic='mean', bins=edges1)
+        mean_theta, _, _ = binned_statistic(y, np.abs(theta), statistic='mean', bins=edges1)
 
         # Plot spatial PDF with average orientation overlaid
         fig, ax1 = plt.subplots(figsize=[8, 6])
         ax1.stairs(pdf1, edges1, color='black')
-        ax1.set_title(f"Spatial PDF: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
+        ax1.set_title(f"Spatial PDF: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
         ax1.set_xlabel("$y/w$")
         ax1.set_ylabel("$P(y/w)$")
         ax1.set_xlim(0, 1)
@@ -737,38 +732,33 @@ class ABP:
         ax2 = ax1.twinx()  # instantiate a second Axes that shares the same x-axis
 
         color = 'tab:red'
-        ax2.set_ylabel(r'$\langle \theta \rangle$', color=color)  # we already handled the x-label with ax1
+        ax2.set_ylabel(r'$\langle |\theta| \rangle$', color=color)  # we already handled the x-label with ax1
         ax2.plot(bin_centres, mean_theta, color=color)
         ax2.tick_params(axis='y', labelcolor=color)
-        ax2.set_yticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
+        ax2.set_yticks([0, np.pi/4, np.pi/2, 3*np.pi/4, np.pi], ['0', r'$\pi/4$', r'$\pi/2$', r'$3\pi/4$', r'$\pi$'])
         plt.tight_layout()
 
-        # Construct orientational PDF
-        pdf2, edges2 = np.histogram(theta, bins=50, density=True)
+        # Find particle orientations near the surface
+        wall = self.wall_index(p)
+        theta_wall = theta[wall.flatten()]
+        # Construct orientational PDF near the surface 
+        pdf4, edges4 = np.histogram(theta_wall, bins=num_bins, density=True)
 
+        # Find particle orientations in the bulk
+        theta_bulk = theta[~wall.flatten()]
+        # Construct orientational PDF in the bulk
+        pdf5, edges5 = np.histogram(theta_bulk, bins=num_bins, density=True)
+
+        # Plot both orientational distributions together
         fig = plt.figure(figsize=[8, 6])
-        plt.stairs(pdf2, edges2, color='black')
-        plt.title(f"Orientational PDF: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
+        plt.stairs(pdf4, edges4, color='red', label='wall')
+        plt.stairs(pdf5, edges5, color='blue', label='bulk')
+        plt.title(f"Orientational PDF: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
         plt.xlabel(r"$\theta$")
         plt.ylabel(r"$P(\theta)$")
         plt.xlim(-np.pi, np.pi)
         plt.xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
-        plt.tight_layout()
-
-        # Find particle orientations near the surface for upstream swimmers
-        trap = self.trapping_index(p, vx_independent)
-        theta_trap = theta[trap.flatten()]
-
-        # Construct orientational PDF near the surface for upstream swimmers
-        pdf3, edges3 = np.histogram(theta_trap, bins=50, density=True)
-
-        fig = plt.figure(figsize=[8, 6])
-        plt.stairs(pdf3, edges3, color='black')
-        plt.title(f"Orientational PDF (trapped): $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
-        plt.xlabel(r"$\theta$")
-        plt.ylabel(r"$P(\theta)$")
-        plt.xlim(-np.pi, np.pi)
-        plt.xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
+        plt.legend(loc='upper center')
         plt.tight_layout()
 
         plt.show()
@@ -796,42 +786,6 @@ class ABP:
             f.write(f"# G = {self.G}\n")
             np.savetxt(f, tt)
 
-    def Displacements(self, pos, orient):
-        """
-        Display the longitudinal displacements for the trajectory of a single ABP over time.
-        
-        Arguments:
-            pos: position history
-        """
-        # Calculate instantaneous displacements
-        dx = np.append([0], pos[1:, 0, 0] - pos[:-1, 0, 0]).flatten()
-        t = np.linspace(0, self.T * self.dt, self.T + 1)
-
-        
-        fig = plt.figure(figsize=[8, 6])
-        plt.title(f"Longitudinal displacements: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $D$ = {self.D}, $G$ = {self.G}")
-        plt.xlabel("$tD_r$")
-        plt.ylabel(r"$\Delta x(t)/w$")
-        plt.scatter(t, dx, color='black', s=1, marker='.', zorder=-1)
-
-        if show_traps:
-            # Calculate orientation angles
-            ex, ey = orient[:, 0, 0], orient[:, 0, 1]
-            theta = np.arctan2(ey, ex)
-            idx_s, idx_e, _ = track_traps(pos[:, 0, 1], self.dt, theta)
-            
-            plt.axvline(t[idx_s][0], color='blue', label='start')
-            for T in t[idx_s][1:]:
-                plt.axvline(T, color='blue')
-            plt.axvline(t[idx_e][0], color='orange', label='end')
-            for T in t[idx_e][1:]:
-                plt.axvline(T, color='orange')
-
-        plt.axvline(tau, color='black', linestyle='dotted', label=r'$t=\tau_r$')
-        plt.legend(loc='lower right')
-        
-        plt.tight_layout()
-        plt.show()
 
 
 
@@ -848,7 +802,7 @@ if __name__ == "__main__":
     parser.add_argument('-T', type=int, default=100000, help='Number of timesteps over which to run the simulation')
     parser.add_argument('-Ps', type=float, default=5, help='Swim Peclet number')
     parser.add_argument('-Pf', type=float, default=5, help='Flow Peclet number')
-    parser.add_argument('-D', type=float, default=0.1, help='Dimensionless ratio of diffusion constants')
+    parser.add_argument('-D', type=float, default=0.01, help='Dimensionless ratio of diffusion constants')
     parser.add_argument('-x', type=float, default=10, help='Distance along x-axis to check for first-passage')
     parser.add_argument('-G', type=float, default=0, help='Geometrical factor related to particle aspect ratio')
     parser.add_argument('--init', action='store_true', help='View the initial configuration of the system')

@@ -180,35 +180,35 @@ def pd3_comparison(filename1, filename2, filename3):
         filename3: filepath to dataset without shear or vorticity
     """
     # Read in and interpret data (1)
-    lp_w1, Pf_Ps1, a1, b1, trap_frac1, mean_vx1 = np.loadtxt(filename1, delimiter=',', skiprows=1, unpack=True)
+    lp_w1, Pf_Ps1, a1, b1, D_eff1, mean_vx1 = np.loadtxt(filename1, delimiter=',', skiprows=1, unpack=True)
     nlp_w1, nPf_Ps1 = np.unique(lp_w1), np.unique(Pf_Ps1)
     size_x1 = len(nlp_w1)
     size_y1 = len(nPf_Ps1)
     A1 = a1.reshape(size_x1, size_y1).T
     B1 = b1.reshape(size_x1, size_y1).T
-    TF1 = trap_frac1.reshape(size_x1, size_y1).T
+    D1 = D_eff1.reshape(size_x1, size_y1).T
     VX1 = mean_vx1.reshape(size_x1, size_y1).T
     X1, Y1 = np.meshgrid(nlp_w1, nPf_Ps1)
 
     # Read in and interpret data (2)
-    lp_w2, Pf_Ps2, a2, b2, trap_frac2, mean_vx2 = np.loadtxt(filename2, delimiter=',', skiprows=1, unpack=True)
+    lp_w2, Pf_Ps2, a2, b2, D_eff2, mean_vx2 = np.loadtxt(filename2, delimiter=',', skiprows=1, unpack=True)
     nlp_w2, nPf_Ps2 = np.unique(lp_w2), np.unique(Pf_Ps2)
     size_x2 = len(nlp_w2)
     size_y2 = len(nPf_Ps2)
     A2 = a2.reshape(size_x2, size_y2).T
     B2 = b2.reshape(size_x2, size_y2).T
-    TF2 = trap_frac2.reshape(size_x2, size_y2).T
+    D2 = D_eff2.reshape(size_x2, size_y2).T
     VX2 = mean_vx2.reshape(size_x2, size_y2).T
     X2, Y2 = np.meshgrid(nlp_w2, nPf_Ps2)
 
     # Read in and interpret data (2)
-    lp_w3, Pf_Ps3, a3, b3, trap_frac3, mean_vx3 = np.loadtxt(filename3, delimiter=',', skiprows=1, unpack=True)
+    lp_w3, Pf_Ps3, a3, b3, D_eff3, mean_vx3 = np.loadtxt(filename3, delimiter=',', skiprows=1, unpack=True)
     nlp_w3, nPf_Ps3= np.unique(lp_w3), np.unique(Pf_Ps3)
     size_x3 = len(nlp_w3)
     size_y3 = len(nPf_Ps3)
     A3 = a3.reshape(size_x3, size_y3).T
     B3 = b3.reshape(size_x3, size_y3).T
-    TF3 = trap_frac3.reshape(size_x3, size_y3).T
+    D3 = D_eff3.reshape(size_x3, size_y3).T
     VX3 = mean_vx3.reshape(size_x3, size_y3).T
     X3, Y3 = np.meshgrid(nlp_w3, nPf_Ps3)
 
@@ -253,6 +253,15 @@ def pd3_comparison(filename1, filename2, filename3):
     norm_vx = colors.TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)
     # Plot comparison of mean longitudinal velocity
     scaling_plot(VX1, VX2, VX3, "Mean longitudinal velocity", r"$\langle v_x \rangle/wD_r$", norm_vx)
+
+    # Find min/max values for effective diffusivity
+    vmin = min(np.nanmin(D1), np.nanmin(D2), np.nanmin(D3))
+    vmax = max(np.nanmax(D1), np.nanmax(D2), np.nanmax(D3))
+    # Normalise divergent colormap
+    norm_Deff = colors.TwoSlopeNorm(vmin=vmin, vcenter=(vmin + vmax)/2, vmax=vmax)
+    # Plot comparison of effective diffusivity
+    # REMOVE FACTOR OF 2 WHEN DIFFUSIVITY CALCULATED CORRECTLY
+    scaling_plot(D1/2, D2/2, D3/2, "Effective diffusivity", r"$D_{\mathrm{eff}}$", norm_Deff)
 
     plt.show()
 
@@ -543,20 +552,14 @@ def effective_constants(filename):
     # Calculate effective diffusivity in the absence of flow
     D_eff_noflow = D**2 + Ps**2 / 4
 
-    print(data['PfPs_D'])
-    print(data['D_eff'])
-    print(data['PfPs_P'])
-    print(data['P_eff'])
-
     # Plot results
     fig = plt.figure(figsize=[8, 6])
     plt.title(f"MSD$_x$ effective constants: $l_p/w$ = {Ps}, $D$ = {D}, $G$ = {G}")
-    plt.scatter(data['PfPs_D'], data['D_eff'], '-o', color='red', markersize=4, label=r'$D_{\mathrm{eff}}$')
-    plt.scatter(data['PfPs_P'], data['P_eff'], '-o', color='blue', markersize=4, label=r'$Pe_{s,\mathrm{eff}}$')
+    plt.plot(data['PfPs_D'], data['D_eff'], '-o', color='red', markersize=4, label=r'$D_{\mathrm{eff}}$')
+    plt.plot(data['PfPs_P'], data['P_eff'], '-o', color='blue', markersize=4, label=r'$Pe_{s,\mathrm{eff}}$')
     plt.xlabel("$Pe_f/Pe_s$")
     plt.ylabel("value of constant")
     plt.axhline(D_eff_noflow, color='black', linestyle='--', label='no flow', alpha=0.5)
-    plt.axhline(Ps, color='black', linestyle='dotted', label='$Pe_s$', alpha=0.5)
     plt.legend(loc='upper left')
     
     plt.tight_layout()
