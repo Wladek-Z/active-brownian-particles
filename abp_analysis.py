@@ -543,11 +543,16 @@ def effective_constants(filename):
     # Calculate effective diffusivity in the absence of flow
     D_eff_noflow = D**2 + Ps**2 / 4
 
+    print(data['PfPs_D'])
+    print(data['D_eff'])
+    print(data['PfPs_P'])
+    print(data['P_eff'])
+
     # Plot results
     fig = plt.figure(figsize=[8, 6])
     plt.title(f"MSD$_x$ effective constants: $l_p/w$ = {Ps}, $D$ = {D}, $G$ = {G}")
-    plt.scatter(data['PfPs_D'], data['D_eff'], color='red', linestyle='-o', markersize=4, label=r'$D_{\mathrm{eff}}$')
-    plt.scatter(data['PfPs_P'], data['P_eff'], color='blue', linestyle='-o', markersize=4, label=r'$Pe_{s,\mathrm{eff}}$')
+    plt.scatter(data['PfPs_D'], data['D_eff'], '-o', color='red', markersize=4, label=r'$D_{\mathrm{eff}}$')
+    plt.scatter(data['PfPs_P'], data['P_eff'], '-o', color='blue', markersize=4, label=r'$Pe_{s,\mathrm{eff}}$')
     plt.xlabel("$Pe_f/Pe_s$")
     plt.ylabel("value of constant")
     plt.axhline(D_eff_noflow, color='black', linestyle='--', label='no flow', alpha=0.5)
