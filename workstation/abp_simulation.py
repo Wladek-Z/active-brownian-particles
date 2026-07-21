@@ -36,7 +36,7 @@ def phase_diagram(filename, N, T, dt, D, l1, u1, l2, u2, n, G):
 
     with open(filename, 'w') as f:
         f.write(f"# G = {G}\n")
-        f.write("lp_w,Pf_Ps,alpha,beta,mean_vx\n")
+        f.write("lp_w,Pf_Ps,alpha,beta,D_eff,mean_vx\n")
 
         for Ps in lp_w_list:
             for Pf_Ps in Pf_Ps_list:
@@ -52,10 +52,12 @@ def phase_diagram(filename, N, T, dt, D, l1, u1, l2, u2, n, G):
                 mean_vx = np.mean(vx_independent)
                 # Get variance scaling exponent
                 var_x = abp.get_variance(pos[:, :, 0])
-                b, _ = abp.get_powerlaw(var_x)
+                b, c = abp.get_powerlaw(var_x)
+                # Calculate effective diffusivity
+                D_eff = np.exp(c) / 2 / d
                 # Track progress
-                print(f"Ps = {Ps}, Pf = {Pf}, alpha = {a}, beta = {b}, mean x-velocity = {mean_vx}")
-                f.write(f"{Ps},{Pf_Ps},{a},{b},{mean_vx}\n")
+                print(f"Ps = {Ps}, Pf = {Pf}, alpha = {a}, beta = {b}, D_eff = {D_eff}, mean x-velocity = {mean_vx}")
+                f.write(f"{Ps},{Pf_Ps},{a},{b},{D_eff},{mean_vx}\n")
 
 def phase_diagram_x(filename, N, T, dt, D, l1, u1, l2, u2, n, G):
     """
@@ -190,7 +192,7 @@ if __name__ == "__main__":
     parser.add_argument('-N', type=int, default=100, help='Number of realisations of the ABP')
     parser.add_argument('-dt', type=float, default=0.001, help='Simulation timestep')
     parser.add_argument('-T', type=int, default=100000, help='Number of timesteps over which to run the simulation')
-    parser.add_argument('-D', type=float, default=0.1, help='Dimensionless ratio of diffusion constants')
+    parser.add_argument('-D', type=float, default=0.01, help='Dimensionless ratio of diffusion constants')
     parser.add_argument('-f', type=str, default=None, help='Filepath to save data')
     parser.add_argument('-F', type=str, default=None, help='Folder in which to store saved data')
     parser.add_argument('--PD', action='store_true', help='Construct the phase diagram')
