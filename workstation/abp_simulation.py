@@ -31,14 +31,15 @@ def phase_diagram(filename, N, T, dt, D, l1, u1, l2, u2, n, G):
         n: number of data points
         G: elongation factor
     """
-    lp_w_list = np.round(np.linspace(l1, u1, n), 3)
+    Ps_list = np.round(np.linspace(l1, u1, n), 3)
     Pf_Ps_list = np.round(np.linspace(l2, u2, n), 3)
 
     with open(filename, 'w') as f:
         f.write(f"# G = {G}\n")
-        f.write("lp_w,Pf_Ps,alpha,beta,D_eff,mean_vx\n")
+        f.write(f"# D = {D}\n")
+        f.write("lp_w,U_v,alpha,beta,D_eff,mean_vx\n")
 
-        for Ps in lp_w_list:
+        for Ps in Ps_list:
             for Pf_Ps in Pf_Ps_list:
                 Pf = Pf_Ps * Ps
                 abp = ABP(N, T, dt, Ps, D, Pf, G)
@@ -49,15 +50,64 @@ def phase_diagram(filename, N, T, dt, D, l1, u1, l2, u2, n, G):
                 # Get mean x-velocity
                 vx = abp.get_xspeed(pos)
                 vx_independent = vx[::abp.step][10:]
-                mean_vx = np.mean(vx_independent)
+                # Take average and divide by Ps to get velocity in units of v0
+                mean_vx = np.mean(vx_independent) / Ps
                 # Get variance scaling exponent
                 var_x = abp.get_variance(pos[:, :, 0])
                 b, c = abp.get_powerlaw(var_x)
                 # Calculate effective diffusivity
-                D_eff = np.exp(c) / 2 / d
+                D_eff = np.exp(c) / 2
                 # Track progress
                 print(f"Ps = {Ps}, Pf = {Pf}, alpha = {a}, beta = {b}, D_eff = {D_eff}, mean x-velocity = {mean_vx}")
                 f.write(f"{Ps},{Pf_Ps},{a},{b},{D_eff},{mean_vx}\n")
+
+def phase_diagram_alt(filename, N, T, dt, D, l1, u1, l2, u2, n, G):
+    """
+    Collect data for various phase diagrams of the ABP system by varying the ration of both
+    Peclet numbers and the ratio of the persistence length and the channel width. This alternative
+    method places the swim Peclet number on the x-axis, and the flow Peclet number on the y-axis.
+
+    Arguments:
+        filename: file to record the data
+        N: number of particles
+        T: number of timesteps
+        dt: timestep
+        D: dimensionless diffusion constant
+        l1: lower bound of data along first axis
+        u1: upper bound of data along first axis
+        l2: lower bound of data along second axis
+        u2: upper bound of data along second axis
+        n: number of data points
+        G: elongation factor
+    """
+    Ps_list = np.round(np.linspace(l1, u1, n), 3)
+    Pf_list = np.round(np.linspace(l2, u2, n), 3)
+
+    with open(filename, 'w') as f:
+        f.write(f"# G = {G}\n")
+        f.write(f"# D = {D}\n")
+        f.write("Ps,Pf,alpha,beta,D_eff,mean_vx\n")
+
+        for Ps in Ps_list:
+            for Pf in Pf_list:
+                abp = ABP(N, T, dt, Ps, D, Pf, G)
+                pos, _ = abp.Run()
+                # Get MSD scaling exponent
+                msd_xy, msd = abp.get_MSD(pos)
+                a, _ = abp.get_powerlaw(msd_xy[:, 0])
+                # Get mean x-velocity
+                vx = abp.get_xspeed(pos)
+                vx_independent = vx[::abp.step][10:]
+                # Take average and divide by Ps to get velocity in units of v0
+                mean_vx = np.mean(vx_independent) / Ps
+                # Get variance scaling exponent
+                var_x = abp.get_variance(pos[:, :, 0])
+                b, c = abp.get_powerlaw(var_x)
+                # Calculate effective diffusivity
+                D_eff = np.exp(c) / 2
+                # Track progress
+                print(f"Ps = {Ps}, Pf = {Pf}, alpha = {a}, beta = {b}, D_eff = {D_eff}, mean x-velocity = {mean_vx}")
+                f.write(f"{Ps},{Pf},{a},{b},{D_eff},{mean_vx}\n")
 
 def phase_diagram_x(filename, N, T, dt, D, l1, u1, l2, u2, n, G):
     """
@@ -196,6 +246,7 @@ if __name__ == "__main__":
     parser.add_argument('-f', type=str, default=None, help='Filepath to save data')
     parser.add_argument('-F', type=str, default=None, help='Folder in which to store saved data')
     parser.add_argument('--PD', action='store_true', help='Construct the phase diagram')
+    parser.add_argument('--PDA', action='store_true', help='Construct the phase diagram with alternative axes')
     parser.add_argument('--PDX', action='store_true', help='Record MSD scaling exponents, including x-direction')
     parser.add_argument('-l1', type=float, help='Lower bound for data collection (first axis)')
     parser.add_argument('-u1', type=float, help='Upper bound for data collection (first axis)')
@@ -220,3 +271,5 @@ if __name__ == "__main__":
         collect_histogram(args.F, args.N, args.T, args.dt, args.Ps, args.D, args.Pf, args.G, args.bins)
     elif args.eff:
         effective_constants(args.f, args.N, args.T, args.dt, args.Ps, args.D, args.G, args.l1, args.u1, args.n)
+    elif args.PDA:
+        phase_diagram_alt(args.f, args.N, args.T, args.dt, args.D, args.l1, args.u1, args.l2, args.u2, args.n, args.G)

@@ -27,14 +27,15 @@ def phase_diagram(filename):
         line1 = f.readline().strip()
         G = float(line1.split("=")[1])
     # Read in and interpret data
-    lp_w, Pf_Ps, a, b, mean_vx = np.loadtxt(filename, delimiter=',', skiprows=2, unpack=True)
-    nlp_w, nPf_Ps = np.unique(lp_w), np.unique(Pf_Ps)
+    lp_w, U_v, a, b, D_eff, mean_vx = np.loadtxt(filename, delimiter=',', skiprows=3, unpack=True)
+    nlp_w, nU_v = np.unique(lp_w), np.unique(U_v)
     size_x = len(nlp_w)
-    size_y = len(nPf_Ps)
+    size_y = len(nU_v)
     A = a.reshape(size_x, size_y).T
     B = b.reshape(size_x, size_y).T
-    VX = mean_vx.reshape(size_x, size_y).T
-    X, Y = np.meshgrid(nlp_w, nPf_Ps)
+    D = D_eff.reshape(size_x, size_y).T 
+    VX = mean_vx.reshape(size_x, size_y).T #/ np.linspace(0.5, 4, 16)
+    X, Y = np.meshgrid(nlp_w, nU_v)
 
     # Normalise divergent colormap
     norm_a = colors.TwoSlopeNorm(vmin=A.min(), vcenter=1.5, vmax=A.max())
@@ -45,7 +46,7 @@ def phase_diagram(filename):
     plt.pcolormesh(X, Y, A, cmap='bwr', norm=norm_a, shading='auto')
     plt.colorbar(label=r'$\alpha$')
     plt.xlabel("$l_p/w$")
-    plt.ylabel("$Pe_f/Pe_s$")
+    plt.ylabel("$U/v_0$")
     plt.tight_layout()
 
     # Normalise divergent colormap
@@ -55,9 +56,9 @@ def phase_diagram(filename):
     fig = plt.figure(figsize=[8, 6])
     plt.title(f"Mean longitudinal velocity: $G$ = {G}")
     plt.pcolormesh(X, Y, VX, cmap='bwr', shading='auto', norm=norm_vx)
-    plt.colorbar(label=r'$\langle v_x \rangle/wD_r$')
+    plt.colorbar(label=r'$\langle v_x \rangle/v_0$')
     plt.xlabel("$l_p/w$")
-    plt.ylabel("$Pe_f/Pe_s$")
+    plt.ylabel("$U/v_0$")
     plt.tight_layout()
 
     # Normalise divergent colormap for variance
@@ -67,106 +68,19 @@ def phase_diagram(filename):
     fig = plt.figure(figsize=[8, 6])
     plt.title(r"Var($\Delta x$) scaling exponent: " + f'$G$ = {G}')
     plt.pcolormesh(X, Y, B, cmap='bwr', shading='auto', norm=norm_var)
-    cbar = plt.colorbar(label=r'$\beta$', spacing='proportional')
+    plt.colorbar(label=r'$\beta$')
     plt.xlabel("$l_p/w$")
-    plt.ylabel("$Pe_f/Pe_s$")
+    plt.ylabel("$U/v_0$")
     plt.tight_layout()
 
-    plt.show()
-
-def pd_comparison(filename1, filename2):
-    """
-    Plot side-by-side phase diagram comparisons for two datasets.
-    
-    Arguments:
-        filename1: filepath to dataset with shear
-        filename2: filepath to dataset without shear
-    """
-    # Read in and interpret data (1)
-    lp_w1, Pf_Ps1, a1, b1, trap_frac1, mean_vx1 = np.loadtxt(filename1, delimiter=',', skiprows=1, unpack=True)
-    nlp_w1, nPf_Ps1 = np.unique(lp_w1), np.unique(Pf_Ps1)
-    size_x1 = len(nlp_w1)
-    size_y1 = len(nPf_Ps1)
-    A1 = a1.reshape(size_x1, size_y1).T
-    B1 = b1.reshape(size_x1, size_y1).T
-    TF1 = trap_frac1.reshape(size_x1, size_y1).T
-    VX1 = mean_vx1.reshape(size_x1, size_y1).T
-    X1, Y1 = np.meshgrid(nlp_w1, nPf_Ps1)
-
-    # Read in and interpret data (2)
-    lp_w2, Pf_Ps2, a2, b2, trap_frac2, mean_vx2 = np.loadtxt(filename2, delimiter=',', skiprows=1, unpack=True)
-    nlp_w2, nPf_Ps2 = np.unique(lp_w2), np.unique(Pf_Ps2)
-    size_x2 = len(nlp_w2)
-    size_y2 = len(nPf_Ps2)
-    A2 = a2.reshape(size_x2, size_y2).T
-    B2 = b2.reshape(size_x2, size_y2).T
-    TF2 = trap_frac2.reshape(size_x2, size_y2).T
-    VX2 = mean_vx2.reshape(size_x2, size_y2).T
-    X2, Y2 = np.meshgrid(nlp_w2, nPf_Ps2)
-
-    # Define custom colormap
-    colours = ['blue', 'white', 'red']
-    cmap = colors.ListedColormap(colours)
-    boundaries = np.array([1, 1.2, 1.8, 2])
-
-    # Plot comparison of MSD scaling exponents
-    fig, axes = plt.subplots(1, 2, figsize=[14, 6], constrained_layout=True, sharey=True)
-    mesh1 = axes[0].pcolormesh(X1, Y1, A1, cmap=cmap, shading='auto')
-    axes[0].set_title('shear effects')
-    axes[0].set_xlabel("$l_p/w$")
-    axes[0].set_ylabel("$Pe_f/Pe_s$")
-    mesh2 = axes[1].pcolormesh(X2, Y2, A2, cmap=cmap, shading='auto')
-    axes[1].set_title('no shear effects')
-    axes[1].set_xlabel("$l_p/w$")
-    fig.suptitle("ABP channel phase diagram comparison")
-    cbar = fig.colorbar(mesh2, ax=axes, location='right', label=r"$\alpha$", boundaries=boundaries, spacing='proportional')
-    cbar.set_ticks([1, 1.2, 1.8, 2])
-    cbar.set_ticklabels([1, 1.2, 1.8, 2])
-
-    # Plot comparison of variance scaling exponents
-    fig, axes = plt.subplots(1, 2, figsize=[14, 6], constrained_layout=True, sharey=True)
-    mesh1 = axes[0].pcolormesh(X1, Y1, B1, cmap=cmap, shading='auto')
-    axes[0].set_title('shear effects')
-    axes[0].set_xlabel("$l_p/w$")
-    axes[0].set_ylabel("$Pe_f/Pe_s$")
-    mesh2 = axes[1].pcolormesh(X2, Y2, B2, cmap=cmap, shading='auto')
-    axes[1].set_title('no shear effects')
-    axes[1].set_xlabel("$l_p/w$")
-    fig.suptitle("ABP channel phase diagram comparison")
-    cbar = fig.colorbar(mesh2, ax=axes, location='right', label=r"$\beta$", boundaries=boundaries, spacing='proportional')
-    cbar.set_ticks([1, 1.2, 1.8, 2])
-    cbar.set_ticklabels([1, 1.2, 1.8, 2])
-
-    # Normalise divergent colormap
-    vmin = min(np.nanmin(VX1), np.nanmin(VX2))
-    vmax = max(np.nanmax(VX1), np.nanmax(VX2))
-    norm_vx = colors.TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)
-
-    # Plot comparison of mean longitudinal velocity    
-    fig, axes = plt.subplots(1, 2, figsize=[14, 6], constrained_layout=True, sharey=True)
-    mesh1 = axes[0].pcolormesh(X1, Y1, VX1, cmap='bwr', shading='auto', norm=norm_vx)
-    axes[0].set_title('shear effects')
-    axes[0].set_xlabel("$l_p/w$")
-    axes[0].set_ylabel("$Pe_f/Pe_s$")
-    mesh2 = axes[1].pcolormesh(X2, Y2, VX2, cmap='bwr', shading='auto', norm=norm_vx)
-    axes[1].set_title('no shear effects')
-    axes[1].set_xlabel("$l_p/w$")
-    fig.suptitle("ABP channel phase diagram comparison")
-    fig.colorbar(mesh2, ax=axes, location='right', label=r"$\langle v_x \rangle/wD_r$")
-
-    # Plot trapping fraction comparison
-    vmin = min(np.nanmin(TF1), np.nanmin(TF2))
-    vmax = max(np.nanmax(TF1), np.nanmax(TF2))
-    fig, axes = plt.subplots(1, 2, figsize=[14, 6], constrained_layout=True, sharey=True)
-    mesh1 = axes[0].pcolormesh(X1, Y1, TF1, cmap='viridis', shading='auto', vmin=vmin, vmax=vmax)
-    axes[0].set_title('shear effects')
-    axes[0].set_xlabel("$l_p/w$")
-    axes[0].set_ylabel("$Pe_f/Pe_s$")
-    mesh2 = axes[1].pcolormesh(X2, Y2, TF2, cmap='viridis', shading='auto', vmin=vmin, vmax=vmax)
-    axes[1].set_title('no shear effects')
-    axes[1].set_xlabel("$l_p/w$")
-    fig.suptitle("ABP channel phase diagram comparison")
-    fig.colorbar(mesh2, ax=axes, location='right', label='trapping fraction')
+    # Plot effective diffusivity
+    fig = plt.figure(figsize=[8, 6])
+    plt.title(r"Effective diffusivity: " + f'$G$ = {G}')
+    plt.pcolormesh(X, Y, D, cmap='rainbow', shading='auto', norm='log')
+    plt.colorbar(label=r'$D_{\mathrm{eff}}$')
+    plt.xlabel("$l_p/w$")
+    plt.ylabel("$U/v_0$")
+    plt.tight_layout()
 
     plt.show()
 
@@ -180,37 +94,37 @@ def pd3_comparison(filename1, filename2, filename3):
         filename3: filepath to dataset without shear or vorticity
     """
     # Read in and interpret data (1)
-    lp_w1, Pf_Ps1, a1, b1, D_eff1, mean_vx1 = np.loadtxt(filename1, delimiter=',', skiprows=1, unpack=True)
-    nlp_w1, nPf_Ps1 = np.unique(lp_w1), np.unique(Pf_Ps1)
+    lp_w1, U_v1, a1, b1, D_eff1, mean_vx1 = np.loadtxt(filename1, delimiter=',', skiprows=3, unpack=True)
+    nlp_w1, nU_v1 = np.unique(lp_w1), np.unique(U_v1)
     size_x1 = len(nlp_w1)
-    size_y1 = len(nPf_Ps1)
+    size_y1 = len(nU_v1)
     A1 = a1.reshape(size_x1, size_y1).T
     B1 = b1.reshape(size_x1, size_y1).T
-    D1 = D_eff1.reshape(size_x1, size_y1).T
-    VX1 = mean_vx1.reshape(size_x1, size_y1).T
-    X1, Y1 = np.meshgrid(nlp_w1, nPf_Ps1)
+    D1 = D_eff1.reshape(size_x1, size_y1).T 
+    VX1 = mean_vx1.reshape(size_x1, size_y1).T 
+    X1, Y1 = np.meshgrid(nlp_w1, nU_v1)
 
     # Read in and interpret data (2)
-    lp_w2, Pf_Ps2, a2, b2, D_eff2, mean_vx2 = np.loadtxt(filename2, delimiter=',', skiprows=1, unpack=True)
-    nlp_w2, nPf_Ps2 = np.unique(lp_w2), np.unique(Pf_Ps2)
+    lp_w2, U_v2, a2, b2, D_eff2, mean_vx2 = np.loadtxt(filename2, delimiter=',', skiprows=3, unpack=True)
+    nlp_w2, nU_v2 = np.unique(lp_w2), np.unique(U_v2)
     size_x2 = len(nlp_w2)
-    size_y2 = len(nPf_Ps2)
+    size_y2 = len(nU_v2)
     A2 = a2.reshape(size_x2, size_y2).T
     B2 = b2.reshape(size_x2, size_y2).T
-    D2 = D_eff2.reshape(size_x2, size_y2).T
-    VX2 = mean_vx2.reshape(size_x2, size_y2).T
-    X2, Y2 = np.meshgrid(nlp_w2, nPf_Ps2)
+    D2 = D_eff2.reshape(size_x2, size_y2).T 
+    VX2 = mean_vx2.reshape(size_x2, size_y2).T 
+    X2, Y2 = np.meshgrid(nlp_w2, nU_v2)
 
     # Read in and interpret data (2)
-    lp_w3, Pf_Ps3, a3, b3, D_eff3, mean_vx3 = np.loadtxt(filename3, delimiter=',', skiprows=1, unpack=True)
-    nlp_w3, nPf_Ps3= np.unique(lp_w3), np.unique(Pf_Ps3)
+    lp_w3, U_v3, a3, b3, D_eff3, mean_vx3 = np.loadtxt(filename3, delimiter=',', skiprows=3, unpack=True)
+    nlp_w3, nU_v3= np.unique(lp_w3), np.unique(U_v3)
     size_x3 = len(nlp_w3)
-    size_y3 = len(nPf_Ps3)
+    size_y3 = len(nU_v3)
     A3 = a3.reshape(size_x3, size_y3).T
     B3 = b3.reshape(size_x3, size_y3).T
-    D3 = D_eff3.reshape(size_x3, size_y3).T
+    D3 = D_eff3.reshape(size_x3, size_y3).T 
     VX3 = mean_vx3.reshape(size_x3, size_y3).T
-    X3, Y3 = np.meshgrid(nlp_w3, nPf_Ps3)
+    X3, Y3 = np.meshgrid(nlp_w3, nU_v3)
 
     # Find minimum/maximum values for alpha
     vmin = np.round(min(np.nanmin(A1), np.nanmin(A2), np.nanmin(A3)), 2)
@@ -219,16 +133,16 @@ def pd3_comparison(filename1, filename2, filename3):
     norm_a = colors.TwoSlopeNorm(vmin=vmin, vcenter=1.5, vmax=vmax)
 
     # Define function for plotting MSD scaling exponents
-    def scaling_plot(data1, data2, data3, title, label, norm):
+    def scaling_plot(data1, data2, data3, title, label, norm, cmap='bwr'):
         fig, axes = plt.subplots(1, 3, figsize=[21, 5], constrained_layout=True, sharey=True)
-        mesh1 = axes[0].pcolormesh(X1, Y1, data1, cmap='bwr', norm=norm, shading='auto')
+        mesh1 = axes[0].pcolormesh(X1, Y1, data1, cmap=cmap, norm=norm, shading='auto')
         axes[0].set_title('vorticity, shear')
         axes[0].set_xlabel("$l_p/w$")
-        axes[0].set_ylabel("$Pe_f/Pe_s$")
-        mesh2 = axes[1].pcolormesh(X2, Y2, data2, cmap='bwr', norm=norm, shading='auto')
+        axes[0].set_ylabel("$U/v_0$")
+        mesh2 = axes[1].pcolormesh(X2, Y2, data2, cmap=cmap, norm=norm, shading='auto')
         axes[1].set_title('vorticity, no shear')
         axes[1].set_xlabel("$l_p/w$")
-        mesh3 = axes[2].pcolormesh(X3, Y3, data3, cmap='bwr', norm=norm, shading='auto')
+        mesh3 = axes[2].pcolormesh(X3, Y3, data3, cmap=cmap, norm=norm, shading='auto')
         axes[2].set_title('no vorticity, no shear')
         axes[2].set_xlabel("$l_p/w$")
         fig.suptitle(title)
@@ -252,16 +166,10 @@ def pd3_comparison(filename1, filename2, filename3):
     # Normalise divergent colormap
     norm_vx = colors.TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)
     # Plot comparison of mean longitudinal velocity
-    scaling_plot(VX1, VX2, VX3, "Mean longitudinal velocity", r"$\langle v_x \rangle/wD_r$", norm_vx)
+    scaling_plot(VX1, VX2, VX3, "Mean longitudinal velocity", r"$\langle v_x \rangle/v_0$", norm_vx)
 
-    # Find min/max values for effective diffusivity
-    vmin = min(np.nanmin(D1), np.nanmin(D2), np.nanmin(D3))
-    vmax = max(np.nanmax(D1), np.nanmax(D2), np.nanmax(D3))
-    # Normalise divergent colormap
-    norm_Deff = colors.TwoSlopeNorm(vmin=vmin, vcenter=(vmin + vmax)/2, vmax=vmax)
     # Plot comparison of effective diffusivity
-    # REMOVE FACTOR OF 2 WHEN DIFFUSIVITY CALCULATED CORRECTLY
-    scaling_plot(D1/2, D2/2, D3/2, "Effective diffusivity", r"$D_{\mathrm{eff}}$", norm_Deff)
+    scaling_plot(D1, D2, D3, "Effective diffusivity", r"$D_{\mathrm{eff}}$", 'log', 'rainbow')
 
     plt.show()
 
@@ -440,7 +348,7 @@ def TTD3(filename1, filename2, filename3):
     # Read parameters and trapping times from first datafile
     with open(filename1, 'r') as f:
         line1 = f.readline().strip()
-        lp_w = float(line1.split("=")[1])
+        lp_w1 = float(line1.split("=")[1])
         line2 = f.readline().strip()
         Ps_Pf1 = float(line2.split("=")[1])
         line3 = f.readline().strip()
@@ -456,6 +364,7 @@ def TTD3(filename1, filename2, filename3):
     # Get parameters and trapping times from second datafile
     with open(filename2, 'r') as f:
         line1 = f.readline().strip()
+        lp_w2 = float(line1.split("=")[1])
         line2 = f.readline().strip()
         Ps_Pf2 = float(line2.split("=")[1])
         tt2 = np.loadtxt(f)
@@ -469,6 +378,7 @@ def TTD3(filename1, filename2, filename3):
     # Get parameters and trapping times from third datafile
     with open(filename3, 'r') as f:
         line1 = f.readline().strip()
+        lp_w3 = float(line1.split("=")[1])
         line2 = f.readline().strip()
         Ps_Pf3 = float(line2.split("=")[1])
         tt3 = np.loadtxt(f)
@@ -479,12 +389,28 @@ def TTD3(filename1, filename2, filename3):
     counts3, bins = np.histogram(data3, bins=num_bins, density=True)
     bin_centres3 = (bins[:-1] + bins[1:]) / 2
 
+    if lp_w1 == lp_w2 == lp_w3:
+        title = f"Trapping time distribution: $l_p/w$ = {lp_w1}, $G$ = {G}"
+        label1 = f'$Pe_f/Pe_s$ = {Ps_Pf1}'
+        label2 = f'$Pe_f/Pe_s$ = {Ps_Pf2}'
+        label3 = f'$Pe_f/Pe_s$ = {Ps_Pf3}'
+    elif Ps_Pf1 == Ps_Pf2 == Ps_Pf3:
+        title = f"Trapping time distribution: $Pe_f/Pe_s$ = {Ps_Pf1}, $G$ = {G}"
+        label1 = f'$l_p/w$ = {lp_w1}'
+        label2 = f'$l_p/w$ = {lp_w2}'
+        label3 = f'$l_p/w$ = {lp_w3}'
+    else:
+        title = f"Trapping time distribution: $G$ = {G}"
+        label1 = f'$l_p/w$ = {lp_w1}, $Pe_f/Pe_s$ = {Ps_Pf1}'
+        label2 = f'$l_p/w$ = {lp_w2}, $Pe_f/Pe_s$ = {Ps_Pf2}'
+        label3 = f'$l_p/w$ = {lp_w3}, $Pe_f/Pe_s$ = {Ps_Pf3}'
+
     # Plot results
     fig = plt.figure(figsize=[8, 6])
-    plt.title(f"Trapping time distribution: $l_p/w$ = {lp_w}, $G$ = {G}, no vorticity")
-    plt.scatter(bin_centres1, counts1, color='red', marker='.', s=10, label=f'$Pe_f/Pe_s$ = {Ps_Pf1}')
-    plt.scatter(bin_centres2, counts2, color='green', marker='.', s=10, label=f'$Pe_f/Pe_s$ = {Ps_Pf2}')
-    plt.scatter(bin_centres3, counts3, color='blue', marker='.', s=10, label=f'$Pe_f/Pe_s$ = {Ps_Pf3}')
+    plt.title(title)
+    plt.scatter(bin_centres1, counts1, color='green', marker='.', s=10, label=label1)
+    plt.scatter(bin_centres2, counts2, color='red', marker='.', s=10, label=label2)
+    plt.scatter(bin_centres3, counts3, color='blue', marker='.', s=10, label=label3)
     plt.xlabel("$tD_r$")
     plt.ylabel("probability density")
     #plt.xscale('log')

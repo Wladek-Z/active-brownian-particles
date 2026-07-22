@@ -11,8 +11,8 @@ def angular_velocity():
     to the combined contribution of both.
     """
     # Define angular velocity formulas
-    omega_shear = lambda yw, theta: 2 * (1 - 2 * yw) * np.cos(2 * theta)
-    omega_flow = lambda yw: 2 * (2 * yw - 1)
+    omega_shear = lambda y, theta: 2 * (1 - 2 * y) * np.cos(2 * theta)
+    omega_flow = lambda y: 2 * (2 * y - 1)
     # Define horizontal coordinates of graph, angles to plot, and labels
     x = np.linspace(0, 1, 40)
     angles = np.arange(0, 5*np.pi/8, np.pi/8)
@@ -27,7 +27,7 @@ def angular_velocity():
         plt.plot(x, O_s, color='red', linestyle='--', label="shear")
         plt.plot(x, O, color='black', linestyle='dotted', label="total")
         plt.xlabel("$y/w$")
-        plt.ylabel(r"$\Omega$ [$Pe_f/w$]")
+        plt.ylabel(r"$\Omega/Pe_fD_r$")
         plt.text(0.5, 0.95, r"$\theta$ = " + label, fontsize=16, ha='center', va='top', transform=plt.gca().transAxes)
         plt.legend(loc='lower center')
         plt.tight_layout()

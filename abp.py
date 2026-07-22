@@ -388,10 +388,10 @@ class ABP:
         # Create array of measurement times
         t = np.arange(1, self.T + 1) * self.dt
         # Theoretical mean square displacement
-        msd_theory = 2 * d * self.D * t + 2 * self.Ps**2 * tau * t - 2 * self.Ps**2 * tau**2 * (1 - np.exp(-t / tau))
+        msd_theory = 2 * d * self.D * t + 2 * self.Ps**2 * t - 2 * self.Ps**2 * (1 - np.exp(-t))
         # Theoretical msd for ballistic and diffusive regimes
         msd_b = self.Ps**2 * t**2 + 2 * d * self.D * t
-        msd_d = 2 * t * (d * self.D + self.Ps**2 * tau)
+        msd_d = 2 * t * (d * self.D + self.Ps**2)
         # Perform fit to late-time data
         a, b = self.get_powerlaw(msd)
         B = np.exp(b)
@@ -437,7 +437,7 @@ class ABP:
         plt.xlabel("$tD_r$")
         plt.ylabel(r"$\langle (\Delta x)^2 \rangle/w^2$")
         if a_x < 1.5:
-            plt.text(10*tau, 0.75*msd_x_fit_10, r'$\alpha$ = ' + f'{np.round(a_x, 2)}\n' + r'$D_{\mathrm{eff}}$ = ' + f'{np.round(B_x/2/d, 2)}', ha='left', va='top', fontsize=12)
+            plt.text(10*tau, 0.75*msd_x_fit_10, r'$\alpha$ = ' + f'{np.round(a_x, 2)}\n' + r'$D_{\mathrm{eff}}$ = ' + f'{np.round(B_x/2, 2)}', ha='left', va='top', fontsize=12)
         else:
             plt.text(10*tau, 0.75*msd_x_fit_10, r'$\alpha$ = ' + f'{np.round(a_x, 2)}\n' + r'$Pe_{s,\mathrm{eff}}$ = ' + f'{np.round(np.sqrt(B_x), 2)}', ha='left', va='top', fontsize=12)
         plt.legend(loc='upper left')
@@ -499,10 +499,10 @@ class ABP:
         # Perform fit to late-time data
         t_fit = np.linspace(tau/self.dt, self.T, 100) * self.dt
         var_fit = np.exp(b) * t_fit**a
-        # Calculate diffusivity
-        D_eff = np.round(np.exp(b) / 2 / d, 2)
-        # Calculate theoretical (diffusive) variance
-        var_theory = 2 * d * (self.D + tau * self.Ps**2 / 2 / d) * t
+        # Calculate diffusivity (x-direction)
+        D_eff = np.round(np.exp(b) / 2, 2)
+        # Calculate theoretical (diffusive) variance (divide by 2 for theory in one dimension)
+        var_theory = (2 * d * (self.D + self.Ps**2 / 2) * t) / 2
         # Calculate variance at t = 10tau
         var_fit_10 = np.exp(b) * (10*tau)**a
 
@@ -759,6 +759,16 @@ class ABP:
         plt.xlim(-np.pi, np.pi)
         plt.xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
         plt.legend(loc='upper center')
+        plt.tight_layout()
+
+        # Construct instantaneous velocity PDF
+        pdf2, edges2 = np.histogram(vx_independent.flatten()/self.Ps, bins=num_bins, density=True)
+
+        fig = plt.figure(figsize=[8, 6])
+        plt.stairs(pdf2, edges2, color='black')
+        plt.title(f"Velocity PDF: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
+        plt.xlabel("$v_x/v_0$")
+        plt.ylabel("$P(v_x/v_0)$")
         plt.tight_layout()
 
         plt.show()
