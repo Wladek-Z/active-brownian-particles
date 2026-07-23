@@ -19,7 +19,7 @@ plt.rcParams['text.usetex'] = False
 d = 2
 tau = 1 / (d - 1)
 vorticity = 1
-noise_r = 1
+noise_r = 0
 arrow_spacing = 100
 centre_start = True
 show_traps = False
@@ -334,7 +334,10 @@ class ABP:
         # Create array of measurement times
         t = np.arange(1, self.T + 1) * self.dt
         # Consider only late-time data, i.e. >> tau
-        late = t >= 10 * tau
+        if self.T >= 1000000:
+            late = t >= 100 * tau
+        else:
+            late = t >= 10 * tau
         y = np.log(data[late])
         x = np.log(t[late])
         # Fit to a 1st degree polynomial
