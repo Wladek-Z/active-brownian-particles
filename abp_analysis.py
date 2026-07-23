@@ -100,7 +100,7 @@ def phase_diagram_alt(filename):
         line1 = f.readline().strip()
         G = float(line1.split("=")[1])
         line2 = f.readline().strip()
-        D = float(line1.split("=")[1])
+        D = float(line2.split("=")[1])
     # Read in and interpret data
     Ps, Pf, a, b, D_eff, mean_vx = np.loadtxt(filename, delimiter=',', skiprows=3, unpack=True)
     nPs, nPf = np.unique(Ps), np.unique(Pf)
@@ -126,12 +126,17 @@ def phase_diagram_alt(filename):
 
     # Normalise divergent colormap
     norm_vx = colors.TwoSlopeNorm(vmin=VX.min(), vcenter=0, vmax=VX.max())
+    part1 = np.linspace(VX.min(), 0, 4)
+    part2 = np.linspace(0, VX.max(), 4)[1:]
+    ticks = np.append(part1, part2)
 
     # Plot mean longitudinal velocity
     fig = plt.figure(figsize=[8, 6])
     plt.title(f"Mean longitudinal velocity: $D$ = {D}, $G$ = {G}")
     plt.pcolormesh(X, Y, VX, cmap='bwr', shading='auto', norm=norm_vx)
-    plt.colorbar(label=r'$\langle v_x \rangle/v_0$')
+    cbar = plt.colorbar(label=r'$\langle v_x \rangle/v_0$')
+    cbar.set_ticks(ticks=ticks)
+    cbar.minorticks_off()
     plt.xlabel("$Pe_s$")
     plt.ylabel("$Pe_f$")
     plt.tight_layout()
@@ -574,6 +579,7 @@ if __name__ == "__main__":
     parser.add_argument('-f2', type=str, default=None, help='Filepath to second dataset, if applicable')
     parser.add_argument('-f3', type=str, default=None, help='Filepath to third dataset, if applicable')
     parser.add_argument('--PD', action='store_true', help='Construct the phase diagram')
+    parser.add_argument('--PDA', action='store_true', help='Construct the alternative phase diagram')
     parser.add_argument('--PD3', action='store_true', help='Compare the phase diagrams of systems with/without shear, vorticity')
     parser.add_argument('--PDX', action='store_true', help='Compare the phase diagrams of alpha for total and longitudinal displacement')
     parser.add_argument('-F', type=str, default=None, help='Folder containing data files')
@@ -586,6 +592,8 @@ if __name__ == "__main__":
 
     if args.PD:
         phase_diagram(args.f1)
+    elif args.PDA:
+        phase_diagram_alt(args.f1)
     if args.PD3:
         pd3_comparison(args.f1, args.f2, args.f3)
     if args.PDX:
