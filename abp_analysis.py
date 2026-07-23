@@ -14,13 +14,22 @@ plt.rcParams['text.usetex'] = False
 tau = 1
 d = 2
 
-def phase_diagram(filename):
+def read_PD_data(filename):
     """
-    Plot the various phase diagrams of the ABP system in the persistence 
-    length-Peclet number ratio plane.
+    Read in phase diagram data.
     
     Arguments:
-        filename: file to stored data
+        filename: filepath to stored data
+    
+    Returns:
+        G: elongation factor
+        D: dimensionless diffusion constant
+        A: MSDx scaling exponent data
+        B: variance scaling exponent data
+        VX: mean longitudinal velocity data
+        Deff: effective diffusivity data
+        X: meshgrid columns
+        Y: meshgrid rows
     """
     # Read parameters
     with open(filename, 'r') as f:
@@ -29,60 +38,60 @@ def phase_diagram(filename):
         line2 = f.readline().strip()
         D = float(line2.split("=")[1])
     # Read in and interpret data
-    lp_w, U_v, a, b, D_eff, mean_vx = np.loadtxt(filename, delimiter=',', skiprows=3, unpack=True)
-    nlp_w, nU_v = np.unique(lp_w), np.unique(U_v)
-    size_x = len(nlp_w)
-    size_y = len(nU_v)
+    x, y, a, b, D_eff, mean_vx = np.loadtxt(filename, delimiter=',', skiprows=3, unpack=True)
+    nx, ny = np.unique(x), np.unique(y)
+    size_x = len(nx)
+    size_y = len(ny)
     A = a.reshape(size_x, size_y).T
     B = b.reshape(size_x, size_y).T
     Deff = D_eff.reshape(size_x, size_y).T 
     VX = mean_vx.reshape(size_x, size_y).T #/ np.linspace(0.5, 4, 16)
-    X, Y = np.meshgrid(nlp_w, nU_v)
+    X, Y = np.meshgrid(nx, ny)
+    # Return data
+    return G, D, A, B, VX, Deff, X, Y
+    
+
+def phase_diagram(filename):
+    """
+    Plot the various phase diagrams of the ABP system in the persistence 
+    length-Peclet number ratio plane.
+    
+    Arguments:
+        filename: filepath to stored data
+    """
+    # Read data
+    G, D, A, B, VX, Deff, X, Y = read_PD_data(filename)
+
+    def plot(data, title, label, norm, cmap='bwr', ticks=None):
+        fig = plt.figure(figsize=[8, 6])
+        plt.title(f"{title}: $D$ = {D}, $G$ = {G}")
+        plt.pcolormesh(X, Y, data, cmap=cmap, norm=norm, shading='auto')
+        cbar = plt.colorbar(label=label)
+        if ticks is not None:
+            cbar.set_ticks(ticks=ticks)
+            cbar.minorticks_off()
+        plt.xlabel("$l_p/w$")
+        plt.ylabel("$Pe_f/Pe_s$")
+        plt.tight_layout()
+        return fig, cbar
 
     # Normalise divergent colormap
     norm_a = colors.TwoSlopeNorm(vmin=A.min(), vcenter=1.5, vmax=A.max())
-
     # Plot MSD scaling exponent
-    fig = plt.figure(figsize=[8, 6])
-    plt.title(f"MSD$_x$ scaling exponent: $D$ = {D}, $G$ = {G}")
-    plt.pcolormesh(X, Y, A, cmap='bwr', norm=norm_a, shading='auto')
-    plt.colorbar(label=r'$\alpha$')
-    plt.xlabel("$l_p/w$")
-    plt.ylabel("$U/v_0$")
-    plt.tight_layout()
+    plot(A, "MSD$_x$ scaling exponent", r'$\alpha$', norm_a)
 
     # Normalise divergent colormap
     norm_vx = colors.TwoSlopeNorm(vmin=VX.min(), vcenter=0, vmax=VX.max())
-
     # Plot mean longitudinal velocity
-    fig = plt.figure(figsize=[8, 6])
-    plt.title(f"Mean longitudinal velocity: $G$ = {G}")
-    plt.pcolormesh(X, Y, VX, cmap='bwr', shading='auto', norm=norm_vx)
-    plt.colorbar(label=r'$\langle v_x \rangle/v_0$')
-    plt.xlabel("$l_p/w$")
-    plt.ylabel("$U/v_0$")
-    plt.tight_layout()
+    plot(VX, "Mean longitudinal velocity", r'$\langle v_x \rangle/v_0$', norm_vx)
 
     # Normalise divergent colormap for variance
     norm_var = colors.TwoSlopeNorm(vmin=np.nanmin(B), vcenter=1, vmax=np.nanmax(B))
-
     # Plot variance of displacement
-    fig = plt.figure(figsize=[8, 6])
-    plt.title(r"Var($\Delta x$) scaling exponent: " + f'$D$ = {D}, $G$ = {G}')
-    plt.pcolormesh(X, Y, B, cmap='bwr', shading='auto', norm=norm_var)
-    plt.colorbar(label=r'$\beta$')
-    plt.xlabel("$l_p/w$")
-    plt.ylabel("$U/v_0$")
-    plt.tight_layout()
+    plot(B, r"Var($\Delta x$) scaling exponent", r"$\beta$", norm_var)
 
     # Plot effective diffusivity
-    fig = plt.figure(figsize=[8, 6])
-    plt.title(r"Effective diffusivity: " + f'$D$ = {D}, $G$ = {G}')
-    plt.pcolormesh(X, Y, Deff, cmap='rainbow', shading='auto', norm='log')
-    plt.colorbar(label=r'$D_{\mathrm{eff}}$')
-    plt.xlabel("$l_p/w$")
-    plt.ylabel("$U/v_0$")
-    plt.tight_layout()
+    plot(Deff, "Effective diffusivity", r'$D_{\mathrm{eff}}$', 'log', 'rainbow')
 
     plt.show()
 
@@ -95,72 +104,42 @@ def phase_diagram_alt(filename):
     Arguments:
         filename: file to stored data
     """
-    # Read parameters
-    with open(filename, 'r') as f:
-        line1 = f.readline().strip()
-        G = float(line1.split("=")[1])
-        line2 = f.readline().strip()
-        D = float(line2.split("=")[1])
-    # Read in and interpret data
-    Ps, Pf, a, b, D_eff, mean_vx = np.loadtxt(filename, delimiter=',', skiprows=3, unpack=True)
-    nPs, nPf = np.unique(Ps), np.unique(Pf)
-    size_x = len(nPs)
-    size_y = len(nPf)
-    A = a.reshape(size_x, size_y).T
-    B = b.reshape(size_x, size_y).T
-    Deff = D_eff.reshape(size_x, size_y).T 
-    VX = mean_vx.reshape(size_x, size_y).T
-    X, Y = np.meshgrid(nPs, nPf)
+    # Read data
+    G, D, A, B, VX, Deff, X, Y = read_PD_data(filename)
 
+    def plot(data, title, label, norm, cmap='bwr', ticks=None):
+        fig = plt.figure(figsize=[8, 6])
+        plt.title(f"{title}: $D$ = {D}, $G$ = {G}")
+        plt.pcolormesh(X, Y, data, cmap=cmap, norm=norm, shading='auto')
+        cbar = plt.colorbar(label=label)
+        if ticks is not None:
+            cbar.set_ticks(ticks=ticks)
+            cbar.minorticks_off()
+        plt.xlabel("$Pe_s$")
+        plt.ylabel("$Pe_f$")
+        plt.tight_layout()
+        return fig, cbar
+    
     # Normalise divergent colormap
     norm_a = colors.TwoSlopeNorm(vmin=A.min(), vcenter=1.5, vmax=A.max())
-
     # Plot MSD scaling exponent
-    fig = plt.figure(figsize=[8, 6])
-    plt.title(f"MSD$_x$ scaling exponent: $D$ = {D}, $G$ = {G}")
-    plt.pcolormesh(X, Y, A, cmap='bwr', norm=norm_a, shading='auto')
-    plt.colorbar(label=r'$\alpha$')
-    plt.xlabel("$Pe_s$")
-    plt.ylabel("$Pe_f$")
-    plt.tight_layout()
+    plot(A, "MSD$_x$ scaling exponent", r'$\alpha$', norm_a)
 
     # Normalise divergent colormap
     norm_vx = colors.TwoSlopeNorm(vmin=VX.min(), vcenter=0, vmax=VX.max())
     part1 = np.linspace(VX.min(), 0, 4)
     part2 = np.linspace(0, VX.max(), 4)[1:]
-    ticks = np.append(part1, part2)
-
+    ticks_vx = np.append(part1, part2)
     # Plot mean longitudinal velocity
-    fig = plt.figure(figsize=[8, 6])
-    plt.title(f"Mean longitudinal velocity: $D$ = {D}, $G$ = {G}")
-    plt.pcolormesh(X, Y, VX, cmap='bwr', shading='auto', norm=norm_vx)
-    cbar = plt.colorbar(label=r'$\langle v_x \rangle/v_0$')
-    cbar.set_ticks(ticks=ticks)
-    cbar.minorticks_off()
-    plt.xlabel("$Pe_s$")
-    plt.ylabel("$Pe_f$")
-    plt.tight_layout()
+    plot(VX, "Mean longitudinal velocity", r'$\langle v_x \rangle/v_0$', norm_vx, ticks=ticks_vx)
 
     # Normalise divergent colormap for variance
     norm_var = colors.TwoSlopeNorm(vmin=np.nanmin(B), vcenter=1, vmax=np.nanmax(B))
-
     # Plot variance of displacement
-    fig = plt.figure(figsize=[8, 6])
-    plt.title(r"Var($\Delta x$) scaling exponent: " + f'$D$ = {D}, $G$ = {G}')
-    plt.pcolormesh(X, Y, B, cmap='bwr', shading='auto', norm=norm_var)
-    plt.colorbar(label=r'$\beta$')
-    plt.xlabel("$Pe_s$")
-    plt.ylabel("$Pe_f$")
-    plt.tight_layout()
+    plot(B, r"Var($\Delta x$) scaling exponent", r'$\beta$', norm_var)
 
     # Plot effective diffusivity
-    fig = plt.figure(figsize=[8, 6])
-    plt.title(r"Effective diffusivity: " + f'$D$ = {D}, $G$ = {G}')
-    plt.pcolormesh(X, Y, Deff, cmap='rainbow', shading='auto', norm='log')
-    plt.colorbar(label=r'$D_{\mathrm{eff}}$')
-    plt.xlabel("$Pe_s$")
-    plt.ylabel("$Pe_f$")
-    plt.tight_layout()
+    plot(Deff, "Effective diffusivity", r'$D_{\mathrm{eff}}$', 'log', 'rainbow')
 
     plt.show()
 
@@ -174,38 +153,14 @@ def pd3_comparison(filename1, filename2, filename3):
         filename2: filepath to dataset without shear
         filename3: filepath to dataset without shear or vorticity
     """
-    # Read in and interpret data (1)
-    lp_w1, U_v1, a1, b1, D_eff1, mean_vx1 = np.loadtxt(filename1, delimiter=',', skiprows=3, unpack=True)
-    nlp_w1, nU_v1 = np.unique(lp_w1), np.unique(U_v1)
-    size_x1 = len(nlp_w1)
-    size_y1 = len(nU_v1)
-    A1 = a1.reshape(size_x1, size_y1).T
-    B1 = b1.reshape(size_x1, size_y1).T
-    D1 = D_eff1.reshape(size_x1, size_y1).T 
-    VX1 = mean_vx1.reshape(size_x1, size_y1).T 
-    X1, Y1 = np.meshgrid(nlp_w1, nU_v1)
+    # Read shear data
+    G1, D1, A1, B1, VX1, Deff1, X1, Y1 = read_PD_data(filename1)
 
-    # Read in and interpret data (2)
-    lp_w2, U_v2, a2, b2, D_eff2, mean_vx2 = np.loadtxt(filename2, delimiter=',', skiprows=3, unpack=True)
-    nlp_w2, nU_v2 = np.unique(lp_w2), np.unique(U_v2)
-    size_x2 = len(nlp_w2)
-    size_y2 = len(nU_v2)
-    A2 = a2.reshape(size_x2, size_y2).T
-    B2 = b2.reshape(size_x2, size_y2).T
-    D2 = D_eff2.reshape(size_x2, size_y2).T 
-    VX2 = mean_vx2.reshape(size_x2, size_y2).T 
-    X2, Y2 = np.meshgrid(nlp_w2, nU_v2)
+    # Read no shear data
+    G2, D2, A2, B2, VX2, Deff2, X2, Y2 = read_PD_data(filename2)
 
-    # Read in and interpret data (2)
-    lp_w3, U_v3, a3, b3, D_eff3, mean_vx3 = np.loadtxt(filename3, delimiter=',', skiprows=3, unpack=True)
-    nlp_w3, nU_v3= np.unique(lp_w3), np.unique(U_v3)
-    size_x3 = len(nlp_w3)
-    size_y3 = len(nU_v3)
-    A3 = a3.reshape(size_x3, size_y3).T
-    B3 = b3.reshape(size_x3, size_y3).T
-    D3 = D_eff3.reshape(size_x3, size_y3).T 
-    VX3 = mean_vx3.reshape(size_x3, size_y3).T
-    X3, Y3 = np.meshgrid(nlp_w3, nU_v3)
+    # Read no shear/vorticity data
+    G3, D3, A3, B3, VX3, Deff3, X3, Y3 = read_PD_data(filename3)
 
     # Find minimum/maximum values for alpha
     vmin = np.round(min(np.nanmin(A1), np.nanmin(A2), np.nanmin(A3)), 2)
@@ -214,7 +169,7 @@ def pd3_comparison(filename1, filename2, filename3):
     norm_a = colors.TwoSlopeNorm(vmin=vmin, vcenter=1.5, vmax=vmax)
 
     # Define function for plotting MSD scaling exponents
-    def scaling_plot(data1, data2, data3, title, label, norm, cmap='bwr'):
+    def plot(data1, data2, data3, title, label, norm, cmap='bwr'):
         fig, axes = plt.subplots(1, 3, figsize=[21, 5], constrained_layout=True, sharey=True)
         mesh1 = axes[0].pcolormesh(X1, Y1, data1, cmap=cmap, norm=norm, shading='auto')
         axes[0].set_title('vorticity, shear')
@@ -226,9 +181,78 @@ def pd3_comparison(filename1, filename2, filename3):
         mesh3 = axes[2].pcolormesh(X3, Y3, data3, cmap=cmap, norm=norm, shading='auto')
         axes[2].set_title('no vorticity, no shear')
         axes[2].set_xlabel("$l_p/w$")
-        fig.suptitle(title)
-        fig.colorbar(mesh3, ax=axes, location='right', label=label)
-        return fig
+        fig.suptitle(f"{title}: $D$ = {D1}")
+        cbar = fig.colorbar(mesh3, ax=axes, location='right', label=label)
+        return fig, cbar
+    
+    # Plot comparison of MSD scaling exponents
+    plot(A1, A2, A3, 'MSD$_x$ scaling exponent', r'$\alpha$', norm_a)
+    
+    # Find min/max values of variance scaling exponent
+    vmin = min(np.nanmin(B1), np.nanmin(B2), np.nanmin(B3))
+    vmax = max(np.nanmax(B1), np.nanmax(B2), np.nanmax(B3))
+    # Normalise divergent colormap
+    norm_var = colors.TwoSlopeNorm(vmin=vmin, vcenter=1, vmax=vmax)
+    # Plot comparison of variance scaling exponents
+    plot(B1, B2, B3, r'Var($\Delta x$) scaling exponent', r'$\beta$', norm_var)
+
+    # Find min/max values for <vx>
+    vmin = min(np.nanmin(VX1), np.nanmin(VX2), np.nanmin(VX3))
+    vmax = max(np.nanmax(VX1), np.nanmax(VX2), np.nanmax(VX3))
+    # Normalise divergent colormap
+    norm_vx = colors.TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)
+    # Plot comparison of mean longitudinal velocity
+    plot(VX1, VX2, VX3, "Mean longitudinal velocity", r"$\langle v_x \rangle/v_0$", norm_vx)
+
+    # Plot comparison of effective diffusivity
+    plot(Deff1, Deff2, Deff3, "Effective diffusivity", r"$D_{\mathrm{eff}}$", 'log', 'rainbow')
+
+    plt.show()
+
+def pd3_comparison_alt(filename1, filename2, filename3):
+    """
+    Plot side-by-side phase diagram comparisons for three datasets, using
+    alternative Peclet number plane.
+    
+    Arguments:
+        filename1: filepath to dataset with shear
+        filename2: filepath to dataset without shear
+        filename3: filepath to dataset without shear or vorticity
+    """
+    # Read shear data
+    G1, D1, A1, B1, Deff1, VX1, X1, Y1 = read_PD_data(filename1)
+
+    # Read no shear data
+    G2, D2, A2, B2, Deff2, VX2, X2, Y2 = read_PD_data(filename2)
+
+    # Read no shear/vorticity data
+    G3, D3, A3, B3, Deff3, VX3, X3, Y3 = read_PD_data(filename3)
+
+    # Find minimum/maximum values for alpha
+    vmin = np.round(min(np.nanmin(A1), np.nanmin(A2), np.nanmin(A3)), 2)
+    vmax = np.round(max(np.nanmax(A1), np.nanmax(A2), np.nanmax(A3)), 2)
+    # Normalise divergent colormap
+    norm_a = colors.TwoSlopeNorm(vmin=vmin, vcenter=1.5, vmax=vmax)
+
+    # Define function for plotting MSD scaling exponents
+    def scaling_plot(data1, data2, data3, title, label, norm, cmap='bwr', ticks=None):
+        fig, axes = plt.subplots(1, 3, figsize=[21, 5], constrained_layout=True, sharey=True)
+        mesh1 = axes[0].pcolormesh(X1, Y1, data1, cmap=cmap, norm=norm, shading='auto')
+        axes[0].set_title('vorticity, shear')
+        axes[0].set_xlabel("$Pe_s$")
+        axes[0].set_ylabel("$Pe_f$")
+        mesh2 = axes[1].pcolormesh(X2, Y2, data2, cmap=cmap, norm=norm, shading='auto')
+        axes[1].set_title('vorticity, no shear')
+        axes[1].set_xlabel("$Pe_s$")
+        mesh3 = axes[2].pcolormesh(X3, Y3, data3, cmap=cmap, norm=norm, shading='auto')
+        axes[2].set_title('no vorticity, no shear')
+        axes[2].set_xlabel("$Pe_s$")
+        fig.suptitle(f"{title}: $D$ = {D1}")
+        cbar = fig.colorbar(mesh3, ax=axes, location='right', label=label)
+        if ticks is not None:
+            cbar.set_ticks(ticks=ticks)
+            cbar.minorticks_off()           
+        return fig, cbar
     
     # Plot comparison of MSD scaling exponents
     scaling_plot(A1, A2, A3, 'MSD$_x$ scaling exponent', r'$\alpha$', norm_a)
@@ -244,10 +268,13 @@ def pd3_comparison(filename1, filename2, filename3):
     # Find min/max values for <vx>
     vmin = min(np.nanmin(VX1), np.nanmin(VX2), np.nanmin(VX3))
     vmax = max(np.nanmax(VX1), np.nanmax(VX2), np.nanmax(VX3))
+    part1 = np.linspace(vmin, 0, 4)
+    part2 = np.linspace(0, vmax, 4)[1:]
+    ticks_vx = np.append(part1, part2)
     # Normalise divergent colormap
     norm_vx = colors.TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)
     # Plot comparison of mean longitudinal velocity
-    scaling_plot(VX1, VX2, VX3, "Mean longitudinal velocity", r"$\langle v_x \rangle/v_0$", norm_vx)
+    scaling_plot(VX1, VX2, VX3, "Mean longitudinal velocity", r"$\langle v_x \rangle/v_0$", norm_vx, ticks=ticks_vx)
 
     # Plot comparison of effective diffusivity
     scaling_plot(D1, D2, D3, "Effective diffusivity", r"$D_{\mathrm{eff}}$", 'log', 'rainbow')

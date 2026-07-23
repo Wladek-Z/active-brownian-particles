@@ -20,8 +20,8 @@ d = 2
 tau = 1 / (d - 1)
 vorticity = 1
 noise_r = 1
-use_arrows = False
-centre_start = False
+arrow_spacing = 100
+centre_start = True
 show_traps = False
 
 @njit
@@ -575,12 +575,10 @@ class ABP:
         plt.ylabel(r"$y/w$")
         plt.axhline(0, color='black', linestyle='--', alpha=0.5)
         plt.axhline(1, color='black', linestyle='--', alpha=0.5)
-        # Construct orientation arrows
-        spacing = 10 #min(2000, self.T // 50)
         # Create array of arrow directions
-        dx, dy = dx[::spacing], dy[::spacing]
+        dx, dy = dx[::arrow_spacing], dy[::arrow_spacing]
         # Create array of arrow bases
-        X, Y = x[::spacing], y[::spacing]
+        X, Y = x[::arrow_spacing], y[::arrow_spacing]
         # Make quiver plot
         plt.quiver(X, Y, dx, dy, color='red', width=0.002, headwidth=3, headlength=4, scale=25, zorder=-1)
         
