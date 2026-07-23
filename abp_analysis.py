@@ -16,8 +16,8 @@ d = 2
 
 def phase_diagram(filename):
     """
-    Plot the various phase diagrams of the ABP system in the Peclet
-    number-persistence length plane.
+    Plot the various phase diagrams of the ABP system in the persistence 
+    length-Peclet number ratio plane.
     
     Arguments:
         filename: file to stored data
@@ -26,6 +26,8 @@ def phase_diagram(filename):
     with open(filename, 'r') as f:
         line1 = f.readline().strip()
         G = float(line1.split("=")[1])
+        line2 = f.readline().strip()
+        D = float(line2.split("=")[1])
     # Read in and interpret data
     lp_w, U_v, a, b, D_eff, mean_vx = np.loadtxt(filename, delimiter=',', skiprows=3, unpack=True)
     nlp_w, nU_v = np.unique(lp_w), np.unique(U_v)
@@ -33,7 +35,7 @@ def phase_diagram(filename):
     size_y = len(nU_v)
     A = a.reshape(size_x, size_y).T
     B = b.reshape(size_x, size_y).T
-    D = D_eff.reshape(size_x, size_y).T 
+    Deff = D_eff.reshape(size_x, size_y).T 
     VX = mean_vx.reshape(size_x, size_y).T #/ np.linspace(0.5, 4, 16)
     X, Y = np.meshgrid(nlp_w, nU_v)
 
@@ -42,7 +44,7 @@ def phase_diagram(filename):
 
     # Plot MSD scaling exponent
     fig = plt.figure(figsize=[8, 6])
-    plt.title(f"MSD$_x$ scaling exponent: $G$ = {G}")
+    plt.title(f"MSD$_x$ scaling exponent: $D$ = {D}, $G$ = {G}")
     plt.pcolormesh(X, Y, A, cmap='bwr', norm=norm_a, shading='auto')
     plt.colorbar(label=r'$\alpha$')
     plt.xlabel("$l_p/w$")
@@ -66,7 +68,7 @@ def phase_diagram(filename):
 
     # Plot variance of displacement
     fig = plt.figure(figsize=[8, 6])
-    plt.title(r"Var($\Delta x$) scaling exponent: " + f'$G$ = {G}')
+    plt.title(r"Var($\Delta x$) scaling exponent: " + f'$D$ = {D}, $G$ = {G}')
     plt.pcolormesh(X, Y, B, cmap='bwr', shading='auto', norm=norm_var)
     plt.colorbar(label=r'$\beta$')
     plt.xlabel("$l_p/w$")
@@ -75,14 +77,88 @@ def phase_diagram(filename):
 
     # Plot effective diffusivity
     fig = plt.figure(figsize=[8, 6])
-    plt.title(r"Effective diffusivity: " + f'$G$ = {G}')
-    plt.pcolormesh(X, Y, D, cmap='rainbow', shading='auto', norm='log')
+    plt.title(r"Effective diffusivity: " + f'$D$ = {D}, $G$ = {G}')
+    plt.pcolormesh(X, Y, Deff, cmap='rainbow', shading='auto', norm='log')
     plt.colorbar(label=r'$D_{\mathrm{eff}}$')
     plt.xlabel("$l_p/w$")
     plt.ylabel("$U/v_0$")
     plt.tight_layout()
 
     plt.show()
+
+
+def phase_diagram_alt(filename):
+    """
+    Plot the various phase diagrams of the ABP system in the swim Peclet
+    number-flow Peclet number plane.
+    
+    Arguments:
+        filename: file to stored data
+    """
+    # Read parameters
+    with open(filename, 'r') as f:
+        line1 = f.readline().strip()
+        G = float(line1.split("=")[1])
+        line2 = f.readline().strip()
+        D = float(line1.split("=")[1])
+    # Read in and interpret data
+    Ps, Pf, a, b, D_eff, mean_vx = np.loadtxt(filename, delimiter=',', skiprows=3, unpack=True)
+    nPs, nPf = np.unique(Ps), np.unique(Pf)
+    size_x = len(nPs)
+    size_y = len(nPf)
+    A = a.reshape(size_x, size_y).T
+    B = b.reshape(size_x, size_y).T
+    Deff = D_eff.reshape(size_x, size_y).T 
+    VX = mean_vx.reshape(size_x, size_y).T
+    X, Y = np.meshgrid(nPs, nPf)
+
+    # Normalise divergent colormap
+    norm_a = colors.TwoSlopeNorm(vmin=A.min(), vcenter=1.5, vmax=A.max())
+
+    # Plot MSD scaling exponent
+    fig = plt.figure(figsize=[8, 6])
+    plt.title(f"MSD$_x$ scaling exponent: $D$ = {D}, $G$ = {G}")
+    plt.pcolormesh(X, Y, A, cmap='bwr', norm=norm_a, shading='auto')
+    plt.colorbar(label=r'$\alpha$')
+    plt.xlabel("$Pe_s$")
+    plt.ylabel("$Pe_f$")
+    plt.tight_layout()
+
+    # Normalise divergent colormap
+    norm_vx = colors.TwoSlopeNorm(vmin=VX.min(), vcenter=0, vmax=VX.max())
+
+    # Plot mean longitudinal velocity
+    fig = plt.figure(figsize=[8, 6])
+    plt.title(f"Mean longitudinal velocity: $D$ = {D}, $G$ = {G}")
+    plt.pcolormesh(X, Y, VX, cmap='bwr', shading='auto', norm=norm_vx)
+    plt.colorbar(label=r'$\langle v_x \rangle/v_0$')
+    plt.xlabel("$Pe_s$")
+    plt.ylabel("$Pe_f$")
+    plt.tight_layout()
+
+    # Normalise divergent colormap for variance
+    norm_var = colors.TwoSlopeNorm(vmin=np.nanmin(B), vcenter=1, vmax=np.nanmax(B))
+
+    # Plot variance of displacement
+    fig = plt.figure(figsize=[8, 6])
+    plt.title(r"Var($\Delta x$) scaling exponent: " + f'$D$ = {D}, $G$ = {G}')
+    plt.pcolormesh(X, Y, B, cmap='bwr', shading='auto', norm=norm_var)
+    plt.colorbar(label=r'$\beta$')
+    plt.xlabel("$Pe_s$")
+    plt.ylabel("$Pe_f$")
+    plt.tight_layout()
+
+    # Plot effective diffusivity
+    fig = plt.figure(figsize=[8, 6])
+    plt.title(r"Effective diffusivity: " + f'$D$ = {D}, $G$ = {G}')
+    plt.pcolormesh(X, Y, Deff, cmap='rainbow', shading='auto', norm='log')
+    plt.colorbar(label=r'$D_{\mathrm{eff}}$')
+    plt.xlabel("$Pe_s$")
+    plt.ylabel("$Pe_f$")
+    plt.tight_layout()
+
+    plt.show()
+
 
 def pd3_comparison(filename1, filename2, filename3):
     """
