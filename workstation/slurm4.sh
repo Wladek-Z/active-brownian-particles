@@ -9,4 +9,4 @@
 #######################################
 
 source .venv/bin/activate
-python abp_simulation.py --PDA -f pdalt_G1.txt -l1 0.25 -u1 4 -l2 0.5 -u2 8 -n 16 -G 1 -N 1000
+python abp_simulation.py --PDA -f pdalt_G0.5.txt -l1 0.25 -u1 4 -l2 0.5 -u2 8 -n 16 -G 0.5 -N 1000
