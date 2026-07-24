@@ -19,9 +19,9 @@ plt.rcParams['text.usetex'] = False
 d = 2
 tau = 1 / (d - 1)
 vorticity = 1
-noise_r = 0
+noise_r = 1
 arrow_spacing = 100
-centre_start = True
+centre_start = False
 show_traps = False
 
 @njit

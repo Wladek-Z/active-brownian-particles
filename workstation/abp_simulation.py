@@ -246,6 +246,7 @@ if __name__ == "__main__":
     parser.add_argument('-f', type=str, default=None, help='Filepath to save data')
     parser.add_argument('-F', type=str, default=None, help='Folder in which to store saved data')
     parser.add_argument('--PD', action='store_true', help='Construct the phase diagram')
+    parser.add_argument('--PD1', action='store_true', help='Collect a single data point for the phase diagram')
     parser.add_argument('--PDA', action='store_true', help='Construct the phase diagram with alternative axes')
     parser.add_argument('--PDX', action='store_true', help='Record MSD scaling exponents, including x-direction')
     parser.add_argument('-l1', type=float, help='Lower bound for data collection (first axis)')
@@ -256,8 +257,6 @@ if __name__ == "__main__":
     parser.add_argument('-G', type=float, default=0, help='Geometrical factor related to particle aspect ratio')
     parser.add_argument('-Ps', type=float, default=5, help='Swim Peclet number')
     parser.add_argument('-Pf', type=float, default=5, help='Flow Peclet number')
-    parser.add_argument('--MSD', action='store_true', help='Find the mean square displacement')
-    parser.add_argument('--trajectory', action='store_true', help='Find the particle trajectory')
     parser.add_argument('-bins', type=int, default=50, help='Number of bins to use in histogram')
     parser.add_argument('--hist', action='store_true', help='Collect data to construct histograms')
     parser.add_argument('--eff', action='store_true', help='Collect data on effective diffusivities/Peclet numbers along an axis')
@@ -267,6 +266,8 @@ if __name__ == "__main__":
         phase_diagram(args.f, args.N, args.T, args.dt, args.D, args.l1, args.u1, args.l2, args.u2, args.n, args.G)
     elif args.PDX:
         phase_diagram_x(args.f, args.N, args.T, args.dt, args.D, args.l1, args.u1, args.l2, args.u2, args.n, args.G)
+    elif args.PD1:
+        phase_diagram_single(args.f, args.N, args.T, args.dt, args.D, args.G, args.Ps, args.Pf)
     elif args.hist:
         collect_histogram(args.F, args.N, args.T, args.dt, args.Ps, args.D, args.Pf, args.G, args.bins)
     elif args.eff:
