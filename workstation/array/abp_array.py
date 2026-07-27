@@ -1,11 +1,7 @@
 import argparse
 import numpy as np
 from pathlib import Path
-import sys
-
-sys.path.append(str(Path(__file__).resolve().parent.parent))
-
-from abp import ABP
+from abp_log import ABPLog
 import os
 
 jobid = os.environ.get("SLURM_JOB_ID", "local")
@@ -54,20 +50,43 @@ def phase_diagram_single(filename, N, T, dt, D, G, Ps, Pf):
     with open(filename, 'w') as f:
         f.write(f"{Ps},{Pf},{a},{b},{D_eff},{mean_vx}")
 
+def raw_single(N, T, dt, D, G, Ps, Pf, folder, tc_file):
+    """
+    Collect the raw data for N particles using the specified Peclet numbers.
+
+    Arguments:
+        N: number of particles
+        T: number of timesteps
+        dt: timestep
+        D: dimensionless diffusion constant
+        G: elongation factor
+        Ps: swim Peclet number
+        Pf: flow Peclet number
+        folder: folder in which to store the raw data
+        tc_file: file containing logscale timechain
+    """
+    abp = ABPLog(N, T, dt, Ps, D, Pf, G, folder)
+    abp.Run(tc_file)
+
+
 if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('-N', type=int, default=1000, help='Number of realisations of the ABP')
     parser.add_argument('-dt', type=float, default=0.001, help='Simulation timestep')
-    parser.add_argument('-T', type=int, default=100000, help='Number of timesteps over which to run the simulation')
+    parser.add_argument('-T', type=int, default=10000000, help='Number of timesteps over which to run the simulation')
     parser.add_argument('-D', type=float, default=0.01, help='Dimensionless ratio of diffusion constants')
     parser.add_argument('-f', type=str, default=None, help='Filepath to save data')
-    parser.add_argument('-F', type=str, default=None, help='Folder in which to store saved data')
+    parser.add_argument('-F', type=str, default=None, help='Folder in which to store data')
     parser.add_argument('--PD1', action='store_true', help='Collect a single data point for the phase diagram')
+    parser.add_argument('--RD1', action='store_true', help='Collect the raw data for one trajectory')
     parser.add_argument('-G', type=float, default=0, help='Geometrical factor related to particle aspect ratio')
     parser.add_argument('-Ps', type=float, default=5, help='Swim Peclet number')
     parser.add_argument('-Pf', type=float, default=5, help='Flow Peclet number')
+    parser.add_argument('-tc', type=str, help='File containing logscale timechain')
     args = parser.parse_args()
 
     if args.PD1:
         phase_diagram_single(args.f, args.N, args.T, args.dt, args.D, args.G, args.Ps, args.Pf)
+    elif args.RD1:
+        raw_single(args.N, args.T, args.dt, args.D, args.G, args.Ps, args.Pf, args.F, args.tc)

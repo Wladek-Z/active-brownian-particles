@@ -1,6 +1,6 @@
-python abp.py -Ps 4 -Pf 6 -N 1000 -G 1 --TTD
-python abp.py -Ps 2.25 -Pf 3.375 -N 1000 -G 1 --TTD
-python abp.py -Ps 0.25 -Pf 0.375 -N 1000 -G 1 --TTD
+python abp.py -Ps 1.5 -Pf 1.875 -N 1000 -G 1 --TTD -T 100000
+python abp.py -Ps 1.5 -Pf 0.75 -N 1000 -G 1 --TTD -T 100000
+python abp.py -Ps 1.5 -Pf 3 -N 1000 -G 1 --TTD -T 100000
 
 echo Done!
 pause

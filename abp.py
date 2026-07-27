@@ -22,7 +22,7 @@ vorticity = 1
 noise_r = 1
 arrow_spacing = 100
 centre_start = False
-show_traps = False
+show_traps = True
 
 @njit
 def run(N, p, e, T, dt, Ps, D, Pf, G):
@@ -201,7 +201,7 @@ def trapping_times(y, orient, N, dt):
     return trap_times
 
 @njit
-def track_traps(y, dt, theta):
+def track_traps_old(y, dt, theta):
     """
     Calculate trapping times within a single ABP trajectory.
     
@@ -247,6 +247,44 @@ def track_traps(y, dt, theta):
         elif timer_trap > 0:
             timer_trap += 1
 
+    return idx_start, idx_end, trap_times
+
+@njit
+def track_traps(y, dt, theta=None):
+    """
+    Calculate trapping times within a single ABP trajectory.
+    
+    Arguments:
+        y: single particle transverse trajectory
+        dt: timestep
+        theta: variable used by different track_traps function
+    
+    Returns:
+        idx_start: the indexes where the ABP enters the trapped state
+        idx_end: the indexes where the ABP leaves the trapped state
+        trap_times: the trapping times in a single trajectory
+    """
+    bottom = 0.05
+    top = 0.95
+    idx_start = np.full(len(y), False)
+    idx_end = np.full(len(y), False)
+    timer = 0
+    trap_times = []
+    min_time = 100
+    # Check trajectory for traps
+    for i in range(1, len(y)):
+        if y[i-1] == y[i] and timer == 0:
+            timer += 1
+        if timer > 0 and (bottom >= y[i] or y[i] >= top):
+            timer += 1
+        elif timer > min_time and (bottom <= y[i] <= top):
+            idx_start[i - timer] = True
+            idx_end[i] = True
+            trap_times.append(timer * dt)
+            timer = 0
+        else:
+            timer = 0
+    # Return trapping indices, trapping times
     return idx_start, idx_end, trap_times
 
 class ABP:
