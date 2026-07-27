@@ -200,6 +200,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Create ABP (logscale data) object
-    abp = ABPLog(args.N, args.T, args.dt, args.Ps, args.D, args.Pf, args.G, args.F)
+    abp = ABPLog(args.N, args.T, args.dt, args.Ps, args.D, args.Pf, args.G)
     # Run simulation
-    abp.Run(args.tc)
+    abp.Run(args.tc, args.F)
