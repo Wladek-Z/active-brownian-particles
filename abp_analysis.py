@@ -143,6 +143,43 @@ def phase_diagram_alt(filename):
 
     plt.show()
 
+def phase_diagram_vx(filename):
+    """
+    Construct a phase diagram of the mean longitudinal velocity.
+    
+    Arguments:
+        filename: filepath to mean velocity results
+    """
+    # Read in and interpret data
+    x, y, mean_vx = np.loadtxt(filename, delimiter=',', skiprows=1, unpack=True)
+    nx, ny = np.unique(x), np.unique(y)
+    size_x = len(nx)
+    size_y = len(ny)
+    VX = mean_vx.reshape(size_x, size_y).T
+    X, Y = np.meshgrid(nx, ny)
+
+    def plot(data, title, label, norm, cmap='bwr', ticks=None):
+        fig = plt.figure(figsize=[8, 6])
+        plt.title(f"{title}")
+        plt.pcolormesh(X, Y, data, cmap=cmap, norm=norm, shading='auto')
+        cbar = plt.colorbar(label=label)
+        if ticks is not None:
+            cbar.set_ticks(ticks=ticks)
+            cbar.minorticks_off()
+        plt.xlabel("$Pe_s$")
+        plt.ylabel("$Pe_f$")
+        plt.tight_layout()
+        return fig, cbar
+
+    # Normalise divergent colormap
+    norm_vx = colors.TwoSlopeNorm(vmin=VX.min(), vcenter=0, vmax=VX.max())
+    part1 = np.linspace(VX.min(), 0, 4)
+    part2 = np.linspace(0, VX.max(), 4)[1:]
+    ticks_vx = np.append(part1, part2)
+    # Plot mean longitudinal velocity
+    plot(VX, "Mean longitudinal velocity", r'$\langle v_x \rangle/v_0$', norm_vx, ticks=ticks_vx)
+
+    plt.show()
 
 def pd3_comparison(filename1, filename2, filename3):
     """
@@ -609,6 +646,7 @@ if __name__ == "__main__":
     parser.add_argument('--PDA', action='store_true', help='Construct the alternative phase diagram')
     parser.add_argument('--PD3', action='store_true', help='Compare the phase diagrams of systems with/without shear, vorticity')
     parser.add_argument('--PDX', action='store_true', help='Compare the phase diagrams of alpha for total and longitudinal displacement')
+    parser.add_argument('--PDVX', action='store_true', help='Construct a phase diagram for the mean longitudinal velocity only')
     parser.add_argument('-F', type=str, default=None, help='Folder containing data files')
     parser.add_argument('--hist', action='store_true', help='Construct histograms from saved data')
     parser.add_argument('--TTD', action='store_true', help='Display the trapping time distribution')
@@ -621,6 +659,8 @@ if __name__ == "__main__":
         phase_diagram(args.f1)
     elif args.PDA:
         phase_diagram_alt(args.f1)
+    elif args.PDVX:
+        phase_diagram_vx(args.f1)
     if args.PD3:
         pd3_comparison(args.f1, args.f2, args.f3)
     if args.PDX:
