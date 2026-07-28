@@ -5,7 +5,7 @@ x=$2
 y=$3
 
 #SBATCH --partition short
-#SBATCH --mem-per-cpu 100M
+#SBATCH --mem-per-cpu 10M
 #SBATCH --time 2:00:00
 #SBATCH --job-name ABP
 #
