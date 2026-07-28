@@ -1,5 +1,6 @@
 import numpy as np
 from pathlib import Path
+import argparse
 
 def collect_phase_diagram(folder, Ps_file, Pf_file, output, timechain, dt):
     """
@@ -17,8 +18,8 @@ def collect_phase_diagram(folder, Ps_file, Pf_file, output, timechain, dt):
         dt: timestep used to collect the raw data
     """
     # Read in Peclet numbers
-    Ps_list = np.loadtxt(Ps_list)
-    Pf_list = np.loadtxt(Pf_list)
+    Ps_list = np.loadtxt(Ps_file)
+    Pf_list = np.loadtxt(Pf_file)
     # Read in timechain
     tc = np.loadtxt(timechain, dtype=np.int64)
 
@@ -30,11 +31,12 @@ def collect_phase_diagram(folder, Ps_file, Pf_file, output, timechain, dt):
     for Ps, Pf, in zip(Ps_list, Pf_list):
         subfolder = f"{folder}/{Ps} {Pf}"
         mean_vx = get_mean_vx(subfolder, Ps, tc, dt)
-        alpha = get_MSD_exponent(subfolder, tc, dt)
-        beta, D_eff = get_variance_exponent_prefactor(subfolder, tc, dt)
+        #alpha = get_MSD_exponent(subfolder, tc, dt)
+        #beta, D_eff = get_variance_exponent_prefactor(subfolder, tc, dt)
         with open(output, "a") as f:
-            f.write(f"{Ps},{Pf},{alpha},{beta},{D_eff},{mean_vx}\n")
-            
+            #f.write(f"{Ps},{Pf},{alpha},{beta},{D_eff},{mean_vx}\n")
+            f.write(f"{Ps},{Pf},{mean_vx}\n")
+
 def get_mean_vx(folder, Ps, tc, dt):
     """
     Calculate the mean instantaneous longitudinal velocity by taking the velocity
@@ -106,4 +108,17 @@ def get_mean_vx2(folder, Ps, tc, dt):
     # Calculate and return mean velocity by Ps
     return sum_vx / counter / Ps
 
+if __name__ == "__main__":
+    # Parse command line arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-F', type=str, default=None, help='Folder containing data for each phase point')
+    parser.add_argument('--PD', action='store_true', help='Collect data for the phase diagram')
+    parser.add_argument('-Ps', type=str, help='Filepath to swim Peclet number parameter file')
+    parser.add_argument('-Pf', type=str, help='Filepath to flow Peclet number parameter file')
+    parser.add_argument('-tc', type=str, help='Filepath to the logscale timechain file')
+    parser.add_argument('-dt', type=float, default=0.001, help='Simulation timestep')
+    parser.add_argument('-o', type=str, help='Name of output file')
+    args = parser.parse_args()
 
+    if args.PD:
+        collect_phase_diagram(args.F, args.Ps, args.Pf, args.o, args.tc, args.dt)
