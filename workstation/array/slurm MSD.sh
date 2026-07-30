@@ -9,12 +9,15 @@
 #######################################
 
 G=1
-o=0
+offset=13
+output="G ${G} results/MSD o${offset}"
 
 x=$(sed -n -e "$SLURM_ARRAY_TASK_ID p" Ps_diffusive.txt)
 y=$(sed -n -e "$SLURM_ARRAY_TASK_ID p" Pf_diffusive.txt)
 
+mkdir -p "${output}"
+
 echo "Task $SLURM_ARRAY_TASK_ID: Ps=$x Pf=$y"
 
 source ../.venv/bin/activate
-python '.\get stats.py' --MSD -F "G ${G}/${x} ${y}" -Ps $x -Pf $y -o "G ${G} results/MSD" -f lags.npz 
+python 'get stats.py' --MSD -F "G ${G}/${x} ${y}" -Ps $x -Pf $y -o "${output}" -f "lags o${offset}.npz" -off ${offset}

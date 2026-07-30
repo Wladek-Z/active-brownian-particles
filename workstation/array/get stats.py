@@ -27,21 +27,30 @@ def get_data(folder, column, offset):
     """
     # Initialise empty data array
     data = np.empty((NBLOCKS - offset, NCONFIGS, N))
-    # Initialise particle number index
-    n = 0
+    
+    # Verify existence of specified directory
+    folder = Path(folder)
+
+    if not folder.exists():
+        raise FileNotFoundError(f"Directory does not exist: {folder}")
+
+    # Sort raw trajectory files
+    files = sorted(folder.glob("*.txt"))
+
+    # Check number of trajectories matches number of particles
+    if len(files) != N:
+        raise RuntimeError(f"Expected {N} trajectory files, found {len(files)} in {folder}")
 
     # Iterate over each particle
-    for file in Path(folder).glob("*.txt"):
+    for n, file in enumerate(files):
         # Calculate number of entries to skip (+ 1 for header)
         skips = offset * NCONFIGS + 1
         # Read data from file
-        d = np.loadtxt(file, skiprows=skips, usecols=column)
+        d = np.loadtxt(file, delimiter=',', skiprows=skips, usecols=column)
         # Reshape data
         d = np.reshape(d, (NBLOCKS - offset, NCONFIGS))
         # Insert into data array
         data[:, :, n] = d
-        # Increment particle number index
-        n += 1
 
     # Return data
     return data
@@ -81,7 +90,7 @@ def get_MSD(folder, Ps, Pf, output, dt, dim, offset, lagsfile):
     averaging over every available time interval, save output to file.
     
     Arguments:
-        folder: directory containing the raw trajectories for each point in Peclet number-space
+        folder: directory containing the raw trajectories for a point in Peclet number-space
         Ps: swim Peclet number of interest
         Pf: flow Peclet number of interest
         output: file in which to store the calculated MSD
@@ -90,14 +99,12 @@ def get_MSD(folder, Ps, Pf, output, dt, dim, offset, lagsfile):
         offset: how many blocks of data to skip at the start of each trajectory
         lagsfile: input file containing the unique measurement time intervals
     """
-    # Get path to sub-directory containing trajectories for one point in Peclet number-space
-    subfolder = f"{folder}/{Ps} {Pf}"
-    # Read in reshaped position data
-    x = get_data(subfolder, dim, offset)
+    # Read in and reshape position data
+    x = get_data(folder, dim, offset)
 
     # Calculate number of blocks, adjusting for offset
     nblocks = x.shape[0]
-
+  
     # Retrieve the set of possible time intervals between measurements from input file
     lags = np.load(lagsfile)['arr_0']
     # Create lookup table for indices corresponding to each lag
@@ -159,5 +166,5 @@ if __name__ == "__main__":
     if args.lag:
         get_lags(args.o, args.off)
     elif args.MSD:
-        get_MSD(args.F, args.Ps, args.Pf, args.o, args.dt, args.d, args.off, args.lag)
+        get_MSD(args.F, args.Ps, args.Pf, args.o, args.dt, args.d, args.off, args.f)
 
