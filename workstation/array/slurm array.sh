@@ -8,7 +8,7 @@
 #
 #######################################
 
-G=$1
+G=1
 
 x=$(sed -n -e "$SLURM_ARRAY_TASK_ID p" Ps_params.txt)
 y=$(sed -n -e "$SLURM_ARRAY_TASK_ID p" Pf_params.txt)
