@@ -11,7 +11,7 @@ BLOCKSIZE = 80000   # Number of timesteps per block
 # Calculate logarithmic sample times within a block
 sample_times = 2**np.arange(NCONFIGS)
 
-def get_data(folder, column, offset):
+def get_data(folder, column, offset, sample=N):
     """
     Extract a column of trajectory data from a directory containing the logscaled trajectories,
     then manipulate into a more useful shape for data analysis. Consider only measurements
@@ -21,12 +21,13 @@ def get_data(folder, column, offset):
         folder: directory containing all N trajectories for a given set of Peclet numbers
         column: which set of data to extract (0 = x, 1 = y, 2 = theta)
         offset: how many blocks of data to skip at the start of each trajectory
+        sample: how many trajectories to sample from the folder
     
     Returns:
         data: reshaped data, shape = (NBLOCKS - offset, NCONFIGS, N)
     """
     # Initialise empty data array
-    data = np.empty((NBLOCKS - offset, NCONFIGS, N))
+    data = np.empty((NBLOCKS - offset, NCONFIGS, sample))
     
     # Verify existence of specified directory
     folder = Path(folder)
@@ -51,9 +52,9 @@ def get_data(folder, column, offset):
         d = np.reshape(d, (NBLOCKS - offset, NCONFIGS))
         # Insert into data array
         data[:, :, n] = d
-
-    # Return data
-    return data
+        # Return after retrieving sample trajectories 
+        if n == sample - 1:
+            return data
 
 def get_lags(filename, offset):
     """
@@ -146,6 +147,70 @@ def get_MSD(folder, Ps, Pf, output, dt, dim, offset, lagsfile):
     # Save to file
     np.savetxt(filename, np.column_stack((times, msd)), header='time MSD')
 
+def get_particle_MSD(folder, Ps, Pf, output, dt, dim, offset, lagsfile, sample):
+    """
+    Calculate the MSD in one dimension for the trajectory of individual particles,
+    averaging only over different origins, for a given combination of Peclet numbers. 
+    Save output to file.
+    
+    Arguments:
+        folder: directory containing the raw trajectories for a point in Peclet number-space
+        Ps: swim Peclet number of interest
+        Pf: flow Peclet number of interest
+        output: file in which to store the calculated SDs
+        dt: simulation timestep for calculating the relevant time intervals
+        dim: dimension along which to calculate SD (0 = x, 1 = y)
+        offset: how many blocks of data to skip at the start of each trajectory
+        lagsfile: input file containing the unique measurement time intervals
+        sample: number of trajectories to consider
+    """
+    # Read in and reshape position data
+    x = get_data(folder, dim, offset, sample)
+
+    # Calculate number of blocks, adjusting for offset
+    nblocks = x.shape[0]
+  
+    # Retrieve the set of possible time intervals between measurements from input file
+    lags = np.load(lagsfile)['arr_0']
+    # Create lookup table for indices corresponding to each lag
+    lag_index = {lag: k for k, lag in enumerate(lags)}
+
+    # Initialise sum of SDs array, counts array
+    sd_sum = np.zeros((sample, len(lags)))
+    count = np.zeros((sample, len(lags)), dtype=int)
+
+    # Iterate over each possible block separation
+    for block_sep in range(nblocks):
+        # Iterate over each measurement within a block
+        for i in range(NCONFIGS):
+            # Avoid measurements going backwards in time
+            j_start = i + 1 if block_sep == 0 else 0
+            for j in range(j_start, NCONFIGS):
+                # Compute the time interval corresponding to this set of measurements
+                lag = (block_sep * BLOCKSIZE + sample_times[j] - sample_times[i])
+                # Check if computed lag definitely appears within dictionary
+                assert lag in lag_index
+                # Obtain lag index
+                k = lag_index[lag]
+                # Calculate displacement
+                dx = x[block_sep:, j] - x[:nblocks - block_sep, i]
+                # Add sum of squares corresponding to each particle at this lag
+                sd_sum[:, k] += np.sum(dx**2, axis=0)
+                # Increment count corresponding to this lag
+                count[:, k] += dx.shape[0]
+
+    # Check for division by zero, in case of any count = 0
+    if np.any(count == 0):
+        raise RuntimeError("Some lag times received no samples.")
+    # Calculate mean square displacement, time intervals
+    msd = sd_sum / count
+    times = lags * dt
+
+    # Get path to output
+    filename = f"{output}/{Ps} {Pf} n{sample}.npz"
+    # Save to file
+    np.savez(filename, time=times, MSD=msd)
+
 
 if __name__ == "__main__":
     # Parse command line arguments
@@ -160,11 +225,15 @@ if __name__ == "__main__":
     parser.add_argument('-d', type=int, default=0, help='Dimension along which to compute MSD')
     parser.add_argument('--lag', action='store_true', help='Calculate the possible measurement time intervals')
     parser.add_argument('--MSD', action='store_true', help='Calculate the mean square displacement')
+    parser.add_argument('--ppMSD', action='store_true', help='Calculate the per-particle mean square displacement')
     parser.add_argument('-off', default=0, type=int, help='Number of blocks by which to offset the data')
+    parser.add_argument('-s', default=N, type=int, help="Number of particle trajectories to use for results")
     args = parser.parse_args()
 
     if args.lag:
         get_lags(args.o, args.off)
     elif args.MSD:
         get_MSD(args.F, args.Ps, args.Pf, args.o, args.dt, args.d, args.off, args.f)
+    elif args.ppMSD:
+        get_particle_MSD(args.F, args.Ps, args.Pf, args.o, args.dt, args.d, args.off, args.f, args.s)
 
