@@ -4,16 +4,16 @@
 #SBATCH --mem-per-cpu 2G
 #SBATCH --time 2:00:00
 #SBATCH --job-name ABP
-#SBATCH --array=1-14
+#SBATCH --array=1-256
 #
 #######################################
 
 G=1
-offset=13
+offset=0
 output="G ${G} results/MSD o${offset}"
 
-x=$(sed -n -e "$SLURM_ARRAY_TASK_ID p" Ps_diffusive.txt)
-y=$(sed -n -e "$SLURM_ARRAY_TASK_ID p" Pf_diffusive.txt)
+x=$(sed -n -e "$SLURM_ARRAY_TASK_ID p" Ps_params.txt)
+y=$(sed -n -e "$SLURM_ARRAY_TASK_ID p" Pf_params.txt)
 
 mkdir -p "${output}"
 

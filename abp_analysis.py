@@ -550,15 +550,23 @@ def TTD3(filename1, filename2, filename3):
         label2 = f'$l_p/w$ = {lp_w2}, $Pe_f/Pe_s$ = {Ps_Pf2}'
         label3 = f'$l_p/w$ = {lp_w3}, $Pe_f/Pe_s$ = {Ps_Pf3}'
 
+    # Find minimum and maximum of independent data
+    bin_min = np.min([np.min(bin_centres1), np.min(bin_centres2), np.min(bin_centres3)])
+    bin_max = np.max([np.max(bin_centres1), np.max(bin_centres2), np.max(bin_centres3)])
+    # Generate x- and y-axis data
+    x = np.linspace(bin_min, bin_max, 50)
+    y = np.exp(-x)
+
     # Plot results
     fig = plt.figure(figsize=[8, 6])
     plt.title(title)
     plt.scatter(bin_centres1, counts1, color='green', marker='.', s=10, label=label1)
     plt.scatter(bin_centres2, counts2, color='red', marker='.', s=10, label=label2)
     plt.scatter(bin_centres3, counts3, color='blue', marker='.', s=10, label=label3)
+    # Plot exponential decay
+    plt.plot(x, y, color='black', label=r'$e^{-t/\tau_r}$')
     plt.xlabel("$tD_r$")
     plt.ylabel("probability density")
-    #plt.xscale('log')
     plt.yscale('log')
     plt.axvline(tau, color='black', linestyle='dotted', label=r'$t=\tau_r$')
     plt.legend(loc='upper right')

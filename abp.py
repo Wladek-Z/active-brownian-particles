@@ -7,6 +7,7 @@ from scipy.stats import binned_statistic
 from scipy.optimize import curve_fit
 import argparse
 import random
+import time
 from pathlib import Path
 import sys
 
@@ -25,13 +26,13 @@ centre_start = False
 show_traps = True
 
 @njit
-def run(N, p, e, T, dt, Ps, D, Pf, G):
+def run(N, r, e, T, dt, Ps, D, Pf, G):
     """
     Run the simulation for T timesteps, recording all positions and orientations.
 
     Arguments:
         N: number of particles
-        p: particle positions
+        r: particle positions
         e: particle orientations
         T: total number of timesteps
         dt: timestep
@@ -45,25 +46,19 @@ def run(N, p, e, T, dt, Ps, D, Pf, G):
         o_hist: history of orientations
     """
     # Initialise arrays to keep track of position/orientation data
-    p_hist = np.zeros((T+1, N, 2))
-    o_hist = np.zeros((T+1, N, 2))
+    r_hist = np.empty((T+1, N, 2))
+    e_hist = np.empty((T+1, N, 2))
     # Store position and orientation of each particle
-    for j in range(N):
-        for k in range(2):
-            p_hist[0, j, k] = p[j, k]
-            o_hist[0, j, k] = e[j, k]
+    r_hist[0] = r
+    e_hist[0] = e
     # Perform T iterations of the update procedure
     for i in range(1, T+1):
         # Update position and orientation
-        p_old = p.copy()
-        e_old = e.copy()
-        p, e = update(N, p_old, e_old, dt, Ps, D, Pf, G)
+        r, e = update(N, r, e, dt, Ps, D, Pf, G)
         # Store position and orientation of each particle
-        for j in range(N):
-            for k in range(2):
-                p_hist[i, j, k] = p[j, k]
-                o_hist[i, j, k] = e[j, k]
-    return p_hist, o_hist   
+        r_hist[i] = r
+        e_hist[i] = e
+    return r_hist, e_hist   
 
 @njit
 def update(N, r, e, dt, Ps, D, Pf, G):
@@ -88,8 +83,10 @@ def update(N, r, e, dt, Ps, D, Pf, G):
         e_new = np.zeros_like(e)
         # Iterate over every particle
         for i in range(N):
+            # Update orientation
+            e_new[i] = orientation(e[i], dt, Pf, r[i, 1], G)
             # Compute swim velocity term
-            r_swim = dt * Ps * e[i] 
+            r_swim = dt * Ps * e_new[i] 
             # Generate translational noise term
             r_noise = np.sqrt(2 * D * dt) * np.random.normal(0, 1, 2) 
             # Update position via forward difference scheme
@@ -99,8 +96,6 @@ def update(N, r, e, dt, Ps, D, Pf, G):
             # Impose reflection at boundaries
             if r_new[i, 1] < 0 or r_new[i, 1] > 1:
                 r_new[i, 1] = r[i, 1]
-            # Update orientation
-            e_new[i] = orientation(e[i], dt, Pf, r_new[i, 1], G)
         # Return updated position and orientation vectors
         return r_new, e_new
 
@@ -119,10 +114,10 @@ def orientation(e, dt, Pf, y, G):
     Returns:
         the updated orientation vector
     """
-    # Calculate change in orientation due to rotational noise
-    d_theta_noise = noise_r * np.sqrt(2 * dt) * np.random.normal(0, 1) 
     # Calculate angle from x-axis of the original orientation vector
     theta = np.arctan2(e[1], e[0])
+    # Calculate change in orientation due to rotational noise
+    d_theta_noise = noise_r * np.sqrt(2 * dt) * np.random.normal(0, 1) 
     # Calculate angular velocity due to vorticity and shear
     d_theta_omega = 2 * dt * Pf * (1 - 2 * y) * (G * np.cos(2 * theta) - vorticity)
     # Calculate new angle
@@ -287,9 +282,48 @@ def track_traps(y, dt, theta=None):
     # Return trapping indices, trapping times
     return idx_start, idx_end, trap_times
 
+@njit
+def track_traps_and_bulk(y, dt):
+    """
+    Calculate trapping and bulk times within a single ABP trajectory.
+    
+    Arguments:
+        y: single particle transverse trajectory
+        dt: timestep
+    
+    Returns:
+        trap_times: the trapping times in a single trajectory
+        bulk_times: the time spent in the bulk sections in a single trajectory
+    """
+    bottom = 0.05
+    top = 0.95
+    timer_t = 0
+    timer_b = 0
+    trap_times = []
+    bulk_times = []
+    min_time = 100
+    # Check trajectory for traps
+    for i in range(1, len(y)):
+        if y[i-1] == y[i] and timer_t == 0:
+            bulk_times.append(timer_b * dt)
+            timer_b = 0
+            timer_t += 1
+        if timer_t > 0 and (bottom >= y[i] or y[i] >= top):
+            timer_t += 1
+            timer_b = 0
+        elif timer_t > min_time and (bottom <= y[i] <= top):
+            trap_times.append(timer_t * dt)
+            timer_t = 0
+            timer_b += 1
+        else:
+            timer_t = 0
+            timer_b += 1
+    # Return trapping times, bulk times
+    return trap_times, bulk_times
+
 class ABP:
     """
-    An ensemble of active Brownian particles experiencing Poisseuille flow in a confined geometry.
+    An ensemble of active Brownian particles experiencing Poiseuille flow in a confined geometry.
     """
 
     def __init__(self, N, T, dt, Ps, D, Pf, G, fptd=False):
@@ -333,12 +367,12 @@ class ABP:
         Run the simulation and return the results.
         
         Returns:
-            pos: position history of each particle
-            orient: orientation history of each particle
+            r_hist: position history of each particle
+            e_hist: orientation history of each particle
         """
         # Run simulation and retrieve data
-        pos, orient = run(self.N, self.r, self.e, self.T, self.dt, self.Ps, self.D, self.Pf, self.G)
-        return pos, orient       
+        r_hist, e_hist = run(self.N, self.r, self.e, self.T, self.dt, self.Ps, self.D, self.Pf, self.G)
+        return r_hist, e_hist       
 
     def get_MSD(self, data):
         """
@@ -848,7 +882,7 @@ if __name__ == "__main__":
     parser.add_argument('--PDF', action='store_true', help='Obtain the probability density functions')
     parser.add_argument('--variance', action='store_true', help='Obtain the variance of longitudinal displacement')
     parser.add_argument('--FPTD', action='store_true', help='Obtain first-passage time distribution')
-    parser.add_argument('-T', type=int, default=100000, help='Number of timesteps over which to run the simulation')
+    parser.add_argument('-T', type=int, default=1000000, help='Number of timesteps over which to run the simulation')
     parser.add_argument('-Ps', type=float, default=5, help='Swim Peclet number')
     parser.add_argument('-Pf', type=float, default=5, help='Flow Peclet number')
     parser.add_argument('-D', type=float, default=0.01, help='Dimensionless ratio of diffusion constants')
