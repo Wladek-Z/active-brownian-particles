@@ -14,9 +14,6 @@ def collect_mean_vx(input, output, Ps, timechain, dt):
         Ps: swim Peclet number
         timechain: logscale timechain file
         dt: simulation timestep
-
-    Returns:
-        mean longitudinal velocity
     """
     # Read in timechain from file
     tc = np.loadtxt(timechain, dtype=np.int64)
@@ -79,17 +76,52 @@ def get_mean_vx2(folder, Ps, tc, dt):
     # Calculate and return mean velocity by Ps
     return sum_vx / counter / Ps
 
+def mean_vx_to_file(input, output, Ps_params, Pf_params):
+    """
+    Collect mean velocities from results folder into a single file sorted into a
+    phase diagram-readable format.
+    
+    Arguments:
+        input: directory containing the individual mean velocity files
+        output: file in which to store collected mean velocity data
+        Ps_params: list of swim Peclet numbers sorted into phase diagram columns
+        Pf_params: list of flow Peclet numbers sorted into phase diagram rows
+    """
+    # Write file header
+    with open(output, "w") as f:
+        f.write("# Ps Pf mean_vx\n")
+
+    # Read in swim/flow Peclet number list
+    Ps_list = np.loadtxt(Ps_params, dtype=str)
+    Pf_list = np.loadtxt(Pf_params, dtype=str)
+
+    # Iterate over Peclet number parameters
+    for Ps, Pf in zip(Ps_list, Pf_list):
+        # Resolve filepath
+        filename = f"{input}/{Ps} {Pf}.txt"
+        # Extract mean velocity
+        vx = np.loadtxt(filename, dtype=float)
+        # Append to output file
+        with open(output, "a") as f:
+            f.write(f"{Ps} {Pf} {vx}\n")
+    
+
 if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('-F', type=str, default=None, help='Directory containing data for each phase point')
+    parser.add_argument('-i', type=str, default=None, help='Directory containing input data')
     parser.add_argument('--VX', action='store_true', help='Collect mean velocity data for a phase point')
-    parser.add_argument('-Ps', type=float, help='Filepath to swim Peclet number parameter file')
-    parser.add_argument('-Pf', type=float, help='Filepath to flow Peclet number parameter file')
+    parser.add_argument('--VXf', action='store_true', help='Collect mean velocity data into a single file')
+    parser.add_argument('-Ps', type=float, help='swim Peclet number')
+    parser.add_argument('-Pf', type=float, help='flow Peclet number parameter')
+    parser.add_argument('-PsL', type=str, help='Filepath to swim Peclet number parameter file')
+    parser.add_argument('-PfL', type=str, help='Filepath to flow Peclet number parameter file')
     parser.add_argument('-tc', type=str, help='Filepath to the logscale timechain file')
     parser.add_argument('-dt', type=float, default=0.001, help='Simulation timestep')
     parser.add_argument('-o', type=str, help='Name of output file')
     args = parser.parse_args()
 
     if args.VX:
-        collect_mean_vx(args.F, args.o, args.Ps, args.tc, args.dt)
+        collect_mean_vx(args.i, args.o, args.Ps, args.tc, args.dt)
+    elif args.VXf:
+        mean_vx_to_file(args.i, args.o, args.PsL, args.PfL)

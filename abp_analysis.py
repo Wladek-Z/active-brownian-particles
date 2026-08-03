@@ -151,34 +151,38 @@ def phase_diagram_vx(filename):
         filename: filepath to mean velocity results
     """
     # Read in and interpret data
-    x, y, mean_vx = np.loadtxt(filename, delimiter=',', skiprows=1, unpack=True)
+    x, y, mean_vx = np.loadtxt(filename, skiprows=1, unpack=True)
     nx, ny = np.unique(x), np.unique(y)
     size_x = len(nx)
     size_y = len(ny)
     VX = mean_vx.reshape(size_x, size_y).T
     X, Y = np.meshgrid(nx, ny)
 
-    def plot(data, title, label, norm, cmap='bwr', ticks=None):
-        fig = plt.figure(figsize=[8, 6])
-        plt.title(f"{title}")
-        plt.pcolormesh(X, Y, data, cmap=cmap, norm=norm, shading='auto')
-        cbar = plt.colorbar(label=label)
-        if ticks is not None:
-            cbar.set_ticks(ticks=ticks)
-            cbar.minorticks_off()
-        plt.xlabel("$Pe_s$")
-        plt.ylabel("$Pe_f$")
-        plt.tight_layout()
-        return fig, cbar
-
     # Normalise divergent colormap
+    title = "Mean longitudinal velocity"
+    label = r'$\langle v_x \rangle/v_0$'
     norm_vx = colors.TwoSlopeNorm(vmin=VX.min(), vcenter=0, vmax=VX.max())
     part1 = np.linspace(VX.min(), 0, 4)
     part2 = np.linspace(0, VX.max(), 4)[1:]
     ticks_vx = np.append(part1, part2)
-    # Plot mean longitudinal velocity
-    plot(VX, "Mean longitudinal velocity", r'$\langle v_x \rangle/v_0$', norm_vx, ticks=ticks_vx)
 
+    # Plot mean longitudinal velocity
+    fig = plt.figure(figsize=[8, 6])
+
+    plt.title(f"{title}")
+    plt.pcolormesh(X, Y, VX, cmap='bwr', norm=norm_vx, shading='auto')
+    cbar = plt.colorbar(label=label)
+    cbar.set_ticks(ticks=ticks_vx)
+    cbar.minorticks_off()
+    plt.xlabel("$Pe_s$")
+    plt.ylabel("$Pe_f$")
+
+    # Plot 2x-1 values as text
+    for Ps, Pf, vx in zip(x, y, mean_vx):
+        if Pf == (2 * Ps - 1):
+            plt.text(Ps, Pf, f"{np.round(vx, 3)}", ha='center', va='center', fontsize=8)
+
+    plt.tight_layout()
     plt.show()
 
 def pd3_comparison(filename1, filename2, filename3):

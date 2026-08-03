@@ -16,4 +16,4 @@ y=$(sed -n -e "$SLURM_ARRAY_TASK_ID p" Pf_params.txt)
 echo "Task $SLURM_ARRAY_TASK_ID: Ps=$x Pf=$y"
 
 source ../.venv/bin/activate
-python collect.py -F "G ${G}/${x} ${y}" -tc timechain10000000.txt -Ps $x --VX -o "G ${G} results/mean velocities/${x} ${y}.txt"
+python collect.py -i "G ${G}/${x} ${y}" -tc timechain10000000.txt -Ps $x --VX -o "G ${G} results/mean velocities/${x} ${y}.txt"
