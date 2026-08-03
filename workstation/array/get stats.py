@@ -310,5 +310,5 @@ if __name__ == "__main__":
     elif args.ppMSD:
         get_particle_MSD(args.F, args.Ps, args.Pf, args.o, args.dt, args.d, args.off, args.f, args.s)
     elif args.old:
-        get_old_MSD(args.F, args.Ps, args.Pf, args.o, args.dt, args.dim, args.off, args.tc)
+        get_old_MSD(args.F, args.Ps, args.Pf, args.o, args.dt, args.d, args.off, args.tc)
 
