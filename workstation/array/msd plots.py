@@ -6,7 +6,10 @@ import argparse
 plt.style.use('science')
 plt.rcParams['text.usetex'] = False
 
-def plot_single_MSD(G, Ps, Pf, offset):
+d = 2
+D = 0.01
+
+def plot_MSD(G, Ps, Pf, offset):
     """
     Plot the mean square displacement for a given set of parameters.
 
@@ -20,15 +23,25 @@ def plot_single_MSD(G, Ps, Pf, offset):
     filename = f"G {G} results/MSD o{offset}/{Ps} {Pf}.txt"
     t, msd = np.loadtxt(filename, unpack=True)
 
+    # Obtain theory curves
+    msd_theory = 2 * d * D * t + 2 * float(Ps)**2 * t - 2 * float(Ps)**2 * (1 - np.exp(-t))
+    # Theoretical msd for ballistic and diffusive regimes
+    msd_b = float(Ps)**2 * t**2 + 2 * d * D * t
+    msd_d = 2 * t * (d * D + float(Ps)**2)
+
     # Plot results
     fig = plt.figure(figsize=[8, 6])
     plt.title(f"MSD$_x$: $Pe_s$ = {Ps}, $Pe_f$ = {Pf}, $G$ = {G}")
     plt.scatter(t, msd, color='black', marker='.', s=10, label='simulation')
+    plt.loglog(t, msd_theory, color='red', linestyle='--', label='theory (no flow)')
+    plt.loglog(t, msd_b, color='blue', linestyle='--', label='ballistic limit')
+    plt.loglog(t, msd_d, color='green', linestyle='--', label='diffusive limit')
     plt.axvline(1, color='black', linestyle='dotted', label=r'$t=\tau_r$')
     plt.xlabel(r"$t/\tau_r$")
     plt.ylabel(r"$\langle (\Delta x)^2 \rangle/w^2$")
     plt.xscale('log')
     plt.yscale('log')
+    plt.legend(loc='upper left')
     plt.tight_layout()
     plt.show()
 
@@ -136,7 +149,7 @@ if __name__ == "__main__":
     parser.add_argument('-Ps', type=str, help="Swim Peclet number")
     parser.add_argument('-Pf', type=str, help="flow Peclet number")
     parser.add_argument('-off', type=int, default=0, help="Skipped logscale blocks")
-    parser.add_argument('--single', action='store_true', help="Plot single MSD")
+    parser.add_argument('--MSD', action='store_true', help="Plot the MSD")
     parser.add_argument('--ppMSD', action='store_true', help="Plot MSDs for individual trajectories")
     parser.add_argument('--all', action='store_true', help="Plot all MSDs from parameter list")
     parser.add_argument('-PsL', type=str, help="List of swim Peclet numbers")
@@ -144,8 +157,8 @@ if __name__ == "__main__":
     parser.add_argument('-s', type=int, help="Number of trajectories to consider")
     args = parser.parse_args()
 
-    if args.single:
-        plot_single_MSD(args.G, args.Ps, args.Pf, args.off)
+    if args.MSD:
+        plot_MSD(args.G, args.Ps, args.Pf, args.off)
     elif args.all:
         plot_all_MSD(args.G, args.PsL, args.PfL, args.off)
     elif args.ppMSD:

@@ -177,10 +177,10 @@ def phase_diagram_vx(filename):
     plt.xlabel("$Pe_s$")
     plt.ylabel("$Pe_f$")
 
-    # Plot 2x-1 values as text
+    # Plot values as text
     for Ps, Pf, vx in zip(x, y, mean_vx):
-        if Pf == (2 * Ps - 1):
-            plt.text(Ps, Pf, f"{np.round(vx, 3)}", ha='center', va='center', fontsize=8)
+        #if Pf == (2 * Ps - 1):
+        plt.text(Ps, Pf, f"{np.round(vx, 3)}", ha='center', va='center', fontsize=8)
 
     plt.tight_layout()
     plt.show()

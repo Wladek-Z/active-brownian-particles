@@ -56,6 +56,48 @@ def get_data(folder, column, offset, sample=N):
         if n == sample - 1:
             return data
 
+def get_old_data(folder, column, offset, sample=N):
+    """
+    Extract the positions along each particle trajectory for a point in Peclet
+    number-space.
+    
+    Arguments:
+        folder: directory containing all N trajectories for a given set of Peclet numbers
+        column: which set of data to extract (0 = x, 1 = y, 2 = theta)
+        offset: how many blocks of data to skip at the start of each trajectory
+        sample: how many trajectories to sample from the folder
+    
+    Returns:
+        data: reshaped position data ((NBLOCKS - offset) * NCONFIGS, N)
+    """
+    # Initialise empty data array
+    data = np.empty(((NBLOCKS - offset) * NCONFIGS, sample))
+    
+    # Verify existence of specified directory
+    folder = Path(folder)
+
+    if not folder.exists():
+        raise FileNotFoundError(f"Directory does not exist: {folder}")
+
+    # Sort raw trajectory files
+    files = sorted(folder.glob("*.txt"))
+
+    # Check number of trajectories matches number of particles
+    if len(files) != N:
+        raise RuntimeError(f"Expected {N} trajectory files, found {len(files)} in {folder}")
+
+    # Iterate over each particle
+    for n, file in enumerate(files):
+        # Calculate number of entries to skip (+ 1 for header)
+        skips = offset * NCONFIGS + 1
+        # Read data from file
+        d = np.loadtxt(file, delimiter=',', skiprows=skips, usecols=column)
+        # Insert into data array
+        data[:, n] = d
+        # Return after retrieving sample trajectories 
+        if n == sample - 1:
+            return data
+
 def get_lags(filename, offset):
     """
     Save the set of unique time intervals between each combination of measurements
@@ -147,6 +189,36 @@ def get_MSD(folder, Ps, Pf, output, dt, dim, offset, lagsfile):
     # Save to file
     np.savetxt(filename, np.column_stack((times, msd)), header='time MSD')
 
+def get_old_MSD(folder, Ps, Pf, output, dt, dim, offset, timechain):
+    """
+    Calculate the MSD in one dimension for a given combination of Peclet numbers 
+    using a single origin and averaging over each particle.
+    
+    Arguments:
+        folder: directory containing the raw trajectories for a point in Peclet number-space
+        Ps: swim Peclet number of interest
+        Pf: flow Peclet number of interest
+        output: file in which to store the calculated MSD
+        dt: simulation timestep for calculating the relevant time intervals
+        dim: dimension along which to calculate MSD (0 = x, 1 = y)
+        offset: how many blocks of data to skip at the start of each trajectory
+        timechain: file containing the logscale timechain
+    """
+    # Read in and reshape position data
+    x = get_old_data(folder, dim, offset)
+    # Read in timechain
+    tc = np.loadtxt(timechain)[offset:]
+
+    # Calculate MSD
+    msd = np.mean((x[1:] - x[0])**2)
+    # Obtain measurement times
+    times = tc[offset:] * dt
+
+    # Get path to output
+    filename = f"{output}/{Ps} {Pf}.txt"
+    # Save to file
+    np.savetxt(filename, np.column_stack((times, msd)), header='time MSD')
+
 def get_particle_MSD(folder, Ps, Pf, output, dt, dim, offset, lagsfile, sample):
     """
     Calculate the MSD in one dimension for the trajectory of individual particles,
@@ -225,6 +297,7 @@ if __name__ == "__main__":
     parser.add_argument('-d', type=int, default=0, help='Dimension along which to compute MSD')
     parser.add_argument('--lag', action='store_true', help='Calculate the possible measurement time intervals')
     parser.add_argument('--MSD', action='store_true', help='Calculate the mean square displacement')
+    parser.add_argument('--old', action='store_true', help='Calculate the mean square displacement using a single origin approach')
     parser.add_argument('--ppMSD', action='store_true', help='Calculate the per-particle mean square displacement')
     parser.add_argument('-off', default=0, type=int, help='Number of blocks by which to offset the data')
     parser.add_argument('-s', default=N, type=int, help="Number of particle trajectories to use for results")
@@ -236,4 +309,6 @@ if __name__ == "__main__":
         get_MSD(args.F, args.Ps, args.Pf, args.o, args.dt, args.d, args.off, args.f)
     elif args.ppMSD:
         get_particle_MSD(args.F, args.Ps, args.Pf, args.o, args.dt, args.d, args.off, args.f, args.s)
+    elif args.old:
+        get_old_MSD(args.F, args.Ps, args.Pf, args.o, args.dt, args.dim, args.off, args.tc)
 
