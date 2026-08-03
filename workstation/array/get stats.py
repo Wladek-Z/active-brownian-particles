@@ -210,9 +210,9 @@ def get_old_MSD(folder, Ps, Pf, output, dt, dim, offset, timechain):
     tc = np.loadtxt(timechain)[offset:]
 
     # Calculate MSD
-    msd = np.mean((x[1:] - x[0])**2)
+    msd = np.mean((x[1:] - x[0])**2, axis=1)
     # Obtain measurement times
-    times = tc[offset:] * dt
+    times = tc[(offset + 1):] * dt
 
     # Get path to output
     filename = f"{output}/{Ps} {Pf}.txt"
