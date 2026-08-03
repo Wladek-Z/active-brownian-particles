@@ -79,6 +79,55 @@ def plot_all_MSD(G, Ps_list, Pf_list, offset):
     plt.tight_layout()
     plt.show()
 
+def plot_pp_MSD(G, Ps, Pf, sample):
+    """
+    Plot the individual MSDs over a sample of trajectories. Plot includes both full
+    MSD and zoom at long times (t > 10^3).
+    
+    Arguments:
+        G: elongation factor
+        Ps: swim Peclet number
+        Pf: flow Peclet number
+        sample: number of trajectories to plot
+    """
+    # Resolve folder filepath
+    filename = f"G {G} results/MSD ind/{Ps} {Pf} n{sample}.npz"
+    # Retrieve MSD data
+    data = np.load(filename)
+    t = data['time']
+    msds = data['MSD']
+
+    # Generate colours for plotting
+    cmap = plt.get_cmap("rainbow")
+    samples = np.linspace(0, 1, sample)
+    colours = cmap(samples)
+
+    # Set up the figure
+    fig, ax = plt.subplots(1, 2, figsize=[16, 6])
+    fig.suptitle(f"MSD$_x$ (per trajectory): $Pe_s$ = {Ps}, $Pe_f$ = {Pf}, $G$ = {G}")
+    ax[0].set_title('full trajectory')
+    ax[0].axvline(1, color='black', linestyle='dotted')
+    ax[0].text(1+1e-1, 1e-5, r'$t=\tau_r$', ha='left', va='bottom', fontsize=12)
+    ax[0].set_xlabel(r"$t/\tau_r$")
+    ax[0].set_ylabel(r"$\langle (\Delta x)^2 \rangle/w^2$")
+    ax[0].set_xscale('log')
+    ax[0].set_yscale('log')
+
+    ax[1].set_title('late-time trajectory')
+    ax[1].set_xlabel(r"$t/\tau_r$")
+    ax[1].set_xscale('log')
+    ax[1].set_yscale('log')
+
+    # Iterate over each MSD, colour
+    for msd, colour in zip(msds, colours):
+        # Add MSD to figures
+        ax[0].scatter(t, msd, color=colour, marker='.', s=10)
+        ax[1].scatter(t[t > 1000], msd[t > 1000], color=colour, marker='.', s=10)
+
+    plt.tight_layout()
+    plt.show()
+
+
 
 if __name__ == "__main__":
     # Parse command line arguments
@@ -88,12 +137,16 @@ if __name__ == "__main__":
     parser.add_argument('-Pf', type=str, help="flow Peclet number")
     parser.add_argument('-off', type=int, default=0, help="Skipped logscale blocks")
     parser.add_argument('--single', action='store_true', help="Plot single MSD")
+    parser.add_argument('--ppMSD', action='store_true', help="Plot MSDs for individual trajectories")
     parser.add_argument('--all', action='store_true', help="Plot all MSDs from parameter list")
     parser.add_argument('-PsL', type=str, help="List of swim Peclet numbers")
     parser.add_argument('-PfL', type=str, help="List of flow Peclet numbers")
+    parser.add_argument('-s', type=int, help="Number of trajectories to consider")
     args = parser.parse_args()
 
     if args.single:
         plot_single_MSD(args.G, args.Ps, args.Pf, args.off)
     elif args.all:
         plot_all_MSD(args.G, args.PsL, args.PfL, args.off)
+    elif args.ppMSD:
+        plot_pp_MSD(args.G, args.Ps, args.Pf, args.s)
