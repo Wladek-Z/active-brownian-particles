@@ -45,7 +45,7 @@ def plot_MSD(G, Ps, Pf, offset):
     plt.tight_layout()
     plt.show()
 
-def plot_all_MSD(G, Ps_list, Pf_list, offset):
+def plot_all_MSD(G, Ps_list, Pf_list, offset, old):
     """
     Plot all MSDs from a list of swim and flow Peclet numbers on one graph.
     
@@ -54,9 +54,13 @@ def plot_all_MSD(G, Ps_list, Pf_list, offset):
         Ps_list: list of swim Peclet numbers
         Pf_list: list of flow Peclet numbers
         offset: skipped logscale blocks
+        old: True if MSDs are to be plotted using a single origin
     """
-    # Resolve folder filepath
-    folder = f"G {G} results/MSD o{offset}"
+    # Resolve folder path
+    if old:
+        folder = f"G {G} results/MSD old o{offset}"
+    else:
+        folder = f"G {G} results/MSD o{offset}"
     # Retrieve Peclet numbers to plot
     Ps = np.loadtxt(Ps_list, dtype=str)
     Pf = np.loadtxt(Pf_list, dtype=str)
@@ -116,7 +120,7 @@ def plot_pp_MSD(G, Ps, Pf, sample):
     colours = cmap(samples)
 
     # Set up the figure
-    fig, ax = plt.subplots(1, 2, figsize=[16, 6])
+    fig, ax = plt.subplots(1, 2, figsize=[12, 6])
     fig.suptitle(f"MSD$_x$ (per trajectory): $Pe_s$ = {Ps}, $Pe_f$ = {Pf}, $G$ = {G}")
     ax[0].set_title('full trajectory')
     ax[0].axvline(1, color='black', linestyle='dotted')
@@ -155,11 +159,12 @@ if __name__ == "__main__":
     parser.add_argument('-PsL', type=str, help="List of swim Peclet numbers")
     parser.add_argument('-PfL', type=str, help="List of flow Peclet numbers")
     parser.add_argument('-s', type=int, help="Number of trajectories to consider")
+    parser.add_argument('-old', action='store_true', help="Specify whether to plot single origin MSDs")
     args = parser.parse_args()
 
     if args.MSD:
         plot_MSD(args.G, args.Ps, args.Pf, args.off)
     elif args.all:
-        plot_all_MSD(args.G, args.PsL, args.PfL, args.off)
+        plot_all_MSD(args.G, args.PsL, args.PfL, args.off, args.old)
     elif args.ppMSD:
         plot_pp_MSD(args.G, args.Ps, args.Pf, args.s)
