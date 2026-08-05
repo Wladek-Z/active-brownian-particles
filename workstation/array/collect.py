@@ -164,7 +164,7 @@ def collect_alpha(input, output, Ps_params, Pf_params, late):
         with open(output, 'a') as f:
             f.write(f"{Ps} {Pf} {alpha}\n")
 
-def collect_trajectories(folder, sample, Ps, Pf):
+def collect_trajectories(folder, sample, Ps, Pf, output):
     """
     Extract the displacements along the x-direction for a sample number of particles, for a
     given point in Peclet number space. Save to file.
@@ -174,6 +174,7 @@ def collect_trajectories(folder, sample, Ps, Pf):
         sample: how many trajectories to sample from the folder
         Ps: swim Peclet number
         Pf: flow Peclet number
+        output: name of output file
     """
     # Initialise empty data array
     data = np.empty((sample, NBLOCKS * NCONFIGS))
@@ -198,8 +199,7 @@ def collect_trajectories(folder, sample, Ps, Pf):
             break
 
     # Save to npz file
-    filename = f"trajs {Ps} {Pf}.npz"
-    np.savez(filename, x=data)
+    np.savez(output, x=data)
 
 
 if __name__ == "__main__":
@@ -217,6 +217,8 @@ if __name__ == "__main__":
     parser.add_argument('-o', type=str, help='Name of output file')
     parser.add_argument('--alpha', action='store_true', help="Collect entire set of MSD scaling exponents")
     parser.add_argument('-l', type=int, default=1000, help="Late-time data start")
+    parser.add_argument('-s', type=int, default=1000, help="Number of samples to take from raw data")
+    parser.add_argument('--trajectory', action='store_true', help="Collect the trajectories of a number of particles")
     args = parser.parse_args()
 
     if args.VX:
@@ -225,3 +227,5 @@ if __name__ == "__main__":
         mean_vx_to_file(args.i, args.o, args.PsL, args.PfL)
     elif args.alpha:
         collect_alpha(args.i, args.o, args.PsL, args.PfL, args.l)
+    elif args.trajectory:
+        collect_trajectories(args.i, args.s, args.Ps, args.Pf, args.o)
