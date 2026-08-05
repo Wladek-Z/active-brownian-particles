@@ -28,7 +28,7 @@ def collect_velocities(input, output, Ps, dt):
         # Increment particle index
         n += 1
         # Read in x-position data
-        x = np.loadtxt(file, skiprows=1, usecols=0)
+        x = np.loadtxt(file, skiprows=1, delimiter=',', usecols=0)
         # Calculate instantaneous velocities
         v = (x[1::NCONFIGS] - x[::NCONFIGS]) / dt
         # Save to velocities array
@@ -57,7 +57,7 @@ def collect_mean_vx(input, output, Ps, dt):
         # Increment number of particles
         particles += 1
         # Read in x-position data
-        x = np.loadtxt(file, skiprows=1, usecols=0)
+        x = np.loadtxt(file, skiprows=1, delimiter=',', usecols=0)
         # Calculate instantaneous velocities
         v = (x[1::NCONFIGS] - x[::NCONFIGS]) / dt
         # Add sum to sum
