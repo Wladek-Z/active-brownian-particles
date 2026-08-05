@@ -1,7 +1,0 @@
-2.txt: oscillates around 0
-4.txt: oscillates around 0
-9.txt: stays near origin (ends at 7)
-11.txt: goes downstream but returns to origin
-115.txt: goes upstream then returns to origin (This is particle 20! files were sorted in a weird way)
-
-NOTE: all trajectories end upstream of where they started!
