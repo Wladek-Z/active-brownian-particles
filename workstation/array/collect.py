@@ -7,7 +7,37 @@ NCONFIGS = 17       # Number of measurements per block
 N = 1000            # Number of particles
 BLOCKSIZE = 80000   # Number of timesteps per block
 
-def collect_mean_vx(input, output, Ps, timechain, dt):
+def collect_velocities(input, output, Ps, dt):
+    """
+    Collect the instantaneous velocities for a histogram pertaining to a certain combination
+    of swim and flow Peclet numbers.
+    
+    Arguments:
+        input: directory containing raw trajectories
+        output: file to store velocity data
+        Ps: swim Peclet number
+        dt: simulation timestep
+    """
+    # Initialise instantaneous velocity array
+    velocities = np.zeros((N, NBLOCKS))
+    # Initialise particle index
+    n = -1
+
+    # Iterate over each particle trajectory in directory
+    for file in Path(input).glob("*.txt"):
+        # Increment particle index
+        n += 1
+        # Read in x-position data
+        x = np.loadtxt(file, skiprows=1, usecols=0)
+        # Calculate instantaneous velocities
+        v = (x[1::NCONFIGS] - x[::NCONFIGS]) / dt
+        # Save to velocities array
+        velocities[n] = v / Ps
+
+    # Save flattened velocity data to file for histogram
+    np.savetxt(output, velocities.flatten())
+
+def collect_mean_vx(input, output, Ps, dt):
     """
     Calculate the mean instantaneous longitudinal velocity for a given combination of
     Peclet numbers by taking the velocity at each pair of consecutive timesteps, separated 
@@ -17,36 +47,24 @@ def collect_mean_vx(input, output, Ps, timechain, dt):
         input: directory containing raw trajectories
         output: file to store results
         Ps: swim Peclet number
-        timechain: logscale timechain file
         dt: simulation timestep
     """
-    # Read in timechain from file
-    tc = np.loadtxt(timechain, dtype=np.int64)
-    # Find the second measurement of each logscale block (+1 to skip header)
-    measurements = np.arange(1, len(tc)-1)[np.diff((tc[1:] - tc[:-1]) == 1)][::2] + 1
-    # Initialise sum of x-velocities, particle counter
+    # Initialise sum of x-velocities
     sum_vx = 0.0
-    particles = 0
 
     # Iterate over each particle trajectory in directory
     for file in Path(input).glob("*.txt"):
         # Increment number of particles
         particles += 1
-        with open(file, "r") as f:
-            # Initialise loop index
-            i = -1
-            # Calculate velocity once per logscale block
-            for line in f:
-                # Increment loop index
-                i += 1
-                if (i + 1) in measurements:
-                    x_prev = np.fromstring(line, sep=',')[0]
-                elif i in measurements:
-                    x = np.fromstring(line, sep=',')[0]
-                    sum_vx += (x - x_prev) / dt
+        # Read in x-position data
+        x = np.loadtxt(file, skiprows=1, usecols=0)
+        # Calculate instantaneous velocities
+        v = (x[1::NCONFIGS] - x[::NCONFIGS]) / dt
+        # Add sum to sum
+        sum_vx += np.sum(v)
 
     # Calculate mean velocity in terms of Ps
-    mean_vx = sum_vx / len(measurements) / particles / Ps   
+    mean_vx = sum_vx / NBLOCKS / N / Ps   
 
     # Save result to file     
     with open(output, "w") as f:
@@ -219,13 +237,16 @@ if __name__ == "__main__":
     parser.add_argument('-l', type=int, default=1000, help="Late-time data start")
     parser.add_argument('-s', type=int, default=1000, help="Number of samples to take from raw data")
     parser.add_argument('--trajectory', action='store_true', help="Collect the trajectories of a number of particles")
+    parser.add_argument('--velocities', action='store_true', help="Collect the instantaneous velocities for a phase point")
     args = parser.parse_args()
 
     if args.VX:
-        collect_mean_vx(args.i, args.o, args.Ps, args.tc, args.dt)
+        collect_mean_vx(args.i, args.o, args.Ps, args.dt)
     elif args.VXf:
         mean_vx_to_file(args.i, args.o, args.PsL, args.PfL)
     elif args.alpha:
         collect_alpha(args.i, args.o, args.PsL, args.PfL, args.l)
     elif args.trajectory:
         collect_trajectories(args.i, args.s, args.Ps, args.Pf, args.o)
+    elif args.velocities:
+        collect_velocities(args.i, args.o, args.Ps, args.dt)

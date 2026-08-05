@@ -29,6 +29,16 @@ def plot_MSD(G, Ps, Pf, offset):
     msd_b = float(Ps)**2 * t**2 + 2 * d * D * t
     msd_d = 2 * t * (d * D + float(Ps)**2)
 
+    # Fit powerlaw to late-time data
+    a, b = get_powerlaw(t, msd)
+    B = np.exp(b)
+    # Define x-axis data for fitted curve
+    t_fit = np.linspace(100, 10000, 50)
+    msd_fit = B * t_fit**a
+    # Calculate MSD at t = 1000tau
+    msd_fit_1000 = B * (1000)**a
+
+
     # Plot results
     fig = plt.figure(figsize=[8, 6])
     plt.title(f"MSD$_x$: $Pe_s$ = {Ps}, $Pe_f$ = {Pf}, $G$ = {G}")
@@ -41,9 +51,39 @@ def plot_MSD(G, Ps, Pf, offset):
     plt.ylabel(r"$\langle (\Delta x)^2 \rangle/w^2$")
     plt.xscale('log')
     plt.yscale('log')
+
+    # Add fitted parameters
+    plt.loglog(t_fit, msd_fit, color='magenta', label=r'$\sim t^{\alpha}$')
+    if a < 1.5:
+        plt.text(1000, 0.75*msd_fit_1000, r'$\alpha$ = ' + f'{np.round(a, 3)}\n' + r'$D_{\mathrm{eff}}$ = ' + f'{np.round(B/2, 3)}', ha='left', va='top', fontsize=12)
+    else:
+        plt.text(1000, 0.75*msd_fit_1000, r'$\alpha$ = ' + f'{np.round(a, 3)}\n' + r'$Pe_{s,\mathrm{eff}}$ = ' + f'{np.round(np.sqrt(B), 3)}', ha='left', va='top', fontsize=12)
+
     plt.legend(loc='upper left')
     plt.tight_layout()
     plt.show()
+
+def get_powerlaw(t, msd):
+    """
+    Obtain the late-time power-law dependence of the MSD.
+    
+    Argument:
+        t: measurement times
+        msd: mean square displacements
+    
+    Returns:
+        a: fitted power
+        b: fitted logarithm of prefactor
+    """
+    # Consider only very late times
+    late = t >= 1000
+    # Take the logarithms of time and MSD
+    y = np.log(msd[late])
+    x = np.log(t[late])
+    # Fit to a 1st degree polynomial
+    a, b = np.polyfit(x, y, 1)
+    # return fitted parameters
+    return a, b
 
 def plot_all_MSD(G, Ps_list, Pf_list, offset, old):
     """
