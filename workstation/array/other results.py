@@ -58,6 +58,47 @@ def plot_displacement(G, Ps, Pf, sample, timechain, start):
     plt.tight_layout()
     plt.show()
 
+def plot_velocities(G, Ps_params, Pf_params):
+    """
+    Plot the histogram of instantaneous velocities for all phase points in a list
+    of swim and flow Peclet numbers, for a given elongation factor.
+    
+    Arguments:
+        G: elongation factor
+        Ps_params: file containing swim Peclet numbers
+        Pf_params: file containing flow Peclet numbers
+    """
+    # Read in swim and flow Peclet numbers from file
+    Ps_list = np.loadtxt(Ps_params, dtype=str)
+    Pf_list = np.loadtxt(Pf_params, dtype=str)
+    sample = len(Ps_list)
+
+    # Generate colours for plotting
+    cmap = plt.get_cmap("rainbow")
+    samples = np.linspace(0, 1, sample)
+    colours = cmap(samples)
+
+    # Set up figure
+    fig = plt.figure(figsize=[8, 6])
+    plt.title(f"Instantaneous velocity PDF: $G$ = {G}")
+    plt.xlabel("$v_x/v_0$")
+    plt.ylabel("$P(v_x/v_0)$")
+
+    # Iterate over each phase point to plot
+    for Ps, Pf, colour in zip(Ps_list, Pf_list, colours):
+        # Read in data
+        filename = f"G {G} results/velocities/v_hist {Ps} {Pf}.txt"
+        v = np.loadtxt(filename)
+        # Construct histogram
+        pdf, edges = np.histogram(v, bins='auto', density=True)
+        # Plot histogram using stairs
+        plt.stairs(pdf, edges, color=colour, label=f"$Pe_s$ = {Ps}, $Pe_f$ = {Pf}")
+
+    # Display figure
+    plt.legend(loc='upper left')
+    plt.tight_layout()
+    plt.show()
+
 if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser()
@@ -68,7 +109,12 @@ if __name__ == "__main__":
     parser.add_argument('-s', type=int, default=None, help="Number of trajectories to consider")
     parser.add_argument('-tc', type=str, default='timechain10000000.txt', help="File containing logscale timechain in timesteps")
     parser.add_argument('-start', type=int, default=0, help="Start samples at this trajectory number")
+    parser.add_argument('--velocity', action='store_true', help="Plot the histograms of velocity from a list of phase points")
+    parser.add_argument('-PsL', type=str, help='Filepath to swim Peclet number parameter file')
+    parser.add_argument('-PfL', type=str, help='Filepath to flow Peclet number parameter file')
     args = parser.parse_args()
 
     if args.displacement:
         plot_displacement(args.G, args.Ps, args.Pf, args.s, args.tc, args.start)
+    elif args.velocity:
+        plot_velocities(args.G, args.PsL, args.PfL)
