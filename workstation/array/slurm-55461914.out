@@ -1,5 +1,0 @@
-Task 55461914: Ps= Pf=
-usage: get stats.py [-h] [-F F] [-Ps PS] [-Pf PF] [-tc TC] [-dt DT] [-f F]
-                    [-o O] [-d D] [--lag] [--MSD] [--old] [--ppMSD] [-off OFF]
-                    [-s S]
-get stats.py: error: argument -Ps: expected one argument
