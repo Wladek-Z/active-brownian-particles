@@ -91,8 +91,11 @@ def plot_velocities(G, Ps_params, Pf_params):
         v = np.loadtxt(filename)
         # Construct histogram
         pdf, edges = np.histogram(v, bins='auto', density=True)
+        # Estimate mean velocity via mode of distribution
+        max_arg = np.argmax(pdf)
+        mode_v = np.round((edges[max_arg] + edges[max_arg + 1]) / 2, 3)
         # Plot histogram using stairs
-        plt.stairs(pdf, edges, color=colour, label=f"$Pe_s$ = {Ps}, $Pe_f$ = {Pf}")
+        plt.stairs(pdf, edges, color=colour, label=f"$Pe_s$ = {Ps}, $Pe_f$ = {Pf}, " + r"$\overline{v}_x \approx$ " + f"{mode_v}")
 
     # Display figure
     plt.legend(loc='upper left')
@@ -109,12 +112,12 @@ if __name__ == "__main__":
     parser.add_argument('-s', type=int, default=None, help="Number of trajectories to consider")
     parser.add_argument('-tc', type=str, default='timechain10000000.txt', help="File containing logscale timechain in timesteps")
     parser.add_argument('-start', type=int, default=0, help="Start samples at this trajectory number")
-    parser.add_argument('--velocity', action='store_true', help="Plot the histograms of velocity from a list of phase points")
+    parser.add_argument('--velocities', action='store_true', help="Plot the histograms of velocity from a list of phase points")
     parser.add_argument('-PsL', type=str, help='Filepath to swim Peclet number parameter file')
     parser.add_argument('-PfL', type=str, help='Filepath to flow Peclet number parameter file')
     args = parser.parse_args()
 
     if args.displacement:
         plot_displacement(args.G, args.Ps, args.Pf, args.s, args.tc, args.start)
-    elif args.velocity:
+    elif args.velocities:
         plot_velocities(args.G, args.PsL, args.PfL)
