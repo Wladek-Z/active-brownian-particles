@@ -263,42 +263,97 @@ class ABP:
             self.Trajectory(pos)
 
 
-    def MSD(self, data, v, T):
+    def MSD(self, data):
         """
         Calculate the mean sqaure displacement of an ensemble of particles over time.
         Plot the results on a graph.
 
         Arguments:
-            data: ABP position history
-            v: ABP velocity
-            T: total number of timesteps
+            data: position history
         """
-        # Calculate mean square displacement along each Cartesian direction
-        msds = np.mean((data - data[0])**2, axis=1)
-        # Calculate total mean square displacement, omitting initial position for logscale
-        msd = np.sum(msds, axis=1)[1:]
+        # Get MSD
+        msd_xy, msd = self.get_MSD(data)
 
-        # Create array of timesteps
-        t = np.arange(1, T + 1) * self.dt
-        # Calculate persistence time
-        tau = 1 / (self.dim - 1)
+        # Create array of measurement times
+        t = np.arange(1, self.T + 1) * self.dt
         # Theoretical mean square displacement
-        msd_theory = 2 * self.dim * t + 2 * v**2 * tau * t - 2 * v**2 * tau**2 * (1 - np.exp(-t / tau))
+        msd_theory = 2 * d * self.D * t + 2 * self.Ps**2 * t - 2 * self.Ps**2 * (1 - np.exp(-t))
         # Theoretical msd for ballistic and diffusive regimes
-        msd_b = v**2 * t**2 + 2 * self.dim * t
-        msd_d = (2 * self.dim + 2 * v**2 * tau) * t 
+        msd_b = self.Ps**2 * t**2 + 2 * d * self.D * t
+        msd_d = 2 * t * (d * self.D + self.Ps**2)
+        # Perform fit to late-time data
+        a, b = self.get_powerlaw(msd)
+        B = np.exp(b)
+        t_fit = np.linspace(tau/self.dt, self.T, 100) * self.dt
+        msd_fit = B * t_fit**a
+        # Calculate MSD at t = 10*tau
+        msd_fit_10 = B * (10*tau)**a
+
+        # Plot MSD with fit and theory lines
+        fig = plt.figure(figsize=[8, 6])
+        plt.title(f"MSD: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
+        plt.scatter(t, msd, color='black', marker='.', s=10, label='simulation')
+        plt.loglog(t, msd_theory, color='red', linestyle='--', label='theory (no flow)')
+        plt.loglog(t, msd_b, color='blue', linestyle='--', label='ballistic limit')
+        plt.loglog(t, msd_d, color='green', linestyle='--', label='diffusive limit')
+        plt.loglog(t_fit, msd_fit, color='magenta', label=r'$\sim t^{\alpha}$')
+        plt.axvline(tau, color='black', linestyle='dotted', label=r'$t=\tau_r$')
+        plt.xlabel("$tD_r$")
+        plt.ylabel(r"$\langle (\Delta r)^2 \rangle/w^2$")
+        if a < 1.5:
+            plt.text(10*tau, 0.75*msd_fit_10, r'$\alpha$ = ' + f'{np.round(a, 2)}\n' + r'$D_{\mathrm{eff}}$ = ' + f'{np.round(B/2/d, 2)}', ha='left', va='top', fontsize=12)
+        else:
+            plt.text(10*tau, 0.75*msd_fit_10, r'$\alpha$ = ' + f'{np.round(a, 2)}\n' + r'$Pe_{s,\mathrm{eff}}$ = ' + f'{np.round(np.sqrt(B), 2)}', ha='left', va='top', fontsize=12)
+        plt.legend(loc='upper left')
+        plt.tight_layout()
+
+        # Calculate MSD in the x-direction and line of best fit fit
+        msd_x = msd_xy[:, 0]
+        a_x, b_x = self.get_powerlaw(msd_x)
+        B_x = np.exp(b_x)
+        msd_x_fit = B_x * t_fit**a_x
+        # Calculate MSD at t = 10*tau
+        msd_x_fit_10 = B_x * (10*tau)**a_x
 
         fig = plt.figure(figsize=[8, 6])
-        plt.title(f"Mean Square Displacement")
-        plt.scatter(t, msd, color='black', marker='.', s=10, label='simulation')
-        plt.loglog(t, msd_theory, color='red', linestyle='--', label='theory')
-        plt.loglog(t, msd_b, color='blue', linestyle='--', label='ballistic')
-        plt.loglog(t, msd_d, color='green', linestyle='--', label='diffusive')
-        plt.axvline(tau, color='orange', label=r'$\tau_r$')
-        plt.xlabel(r"time [$1/D_r$]")
-        plt.ylabel(r"$\langle r^2 \rangle$ [$\sigma^2$]")
-        plt.legend()
+        plt.title(f"MSD$_x$: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
+        plt.scatter(t, msd_x, color='black', marker='.', s=10, label='simulation')
+        plt.loglog(t, msd_theory/2, color='red', linestyle='--', label='theory (no flow)')
+        plt.loglog(t, msd_b/2, color='blue', linestyle='--', label='ballistic limit')
+        plt.loglog(t, msd_d/2, color='green', linestyle='--', label='diffusive limit')
+        plt.loglog(t_fit, msd_x_fit, color='magenta', label=r'$\sim t^{\alpha}$')
+        plt.axvline(tau, color='black', linestyle='dotted', label=r'$t=\tau_r$')
+        plt.xlabel("$tD_r$")
+        plt.ylabel(r"$\langle (\Delta x)^2 \rangle/w^2$")
+        if a_x < 1.5:
+            plt.text(10*tau, 0.75*msd_x_fit_10, r'$\alpha$ = ' + f'{np.round(a_x, 2)}\n' + r'$D_{\mathrm{eff}}$ = ' + f'{np.round(B_x/2, 2)}', ha='left', va='top', fontsize=12)
+        else:
+            plt.text(10*tau, 0.75*msd_x_fit_10, r'$\alpha$ = ' + f'{np.round(a_x, 2)}\n' + r'$Pe_{s,\mathrm{eff}}$ = ' + f'{np.round(np.sqrt(B_x), 2)}', ha='left', va='top', fontsize=12)
+        plt.legend(loc='upper left')
         plt.tight_layout()
+
+        # Calculate MSD in the y-direction and line of best fit fit
+        msd_y = msd_xy[:, 1]
+        a_y, b_y = self.get_powerlaw(msd_y)
+        B_y = np.exp(b_y)
+        msd_y_fit = B_y * t_fit**a_y
+        # Calculate MSD at t = 10*tau
+        msd_y_fit_10 = B_y * (10*tau)**a_y
+
+        fig = plt.figure(figsize=[8, 6])
+        plt.title(f"MSD$_y$: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
+        plt.scatter(t, msd_y, color='black', marker='.', s=10, label='simulation')
+        plt.loglog(t, msd_theory/2, color='red', linestyle='--', label='theory (no flow)')
+        plt.loglog(t, msd_b/2, color='blue', linestyle='--', label='ballistic limit')
+        plt.loglog(t, msd_d/2, color='green', linestyle='--', label='diffusive limit')
+        plt.loglog(t_fit, msd_y_fit, color='magenta', label=r'$\sim t^{\alpha}$')
+        plt.axvline(tau, color='black', linestyle='dotted', label=r'$t=\tau_r$')
+        plt.xlabel("$tD_r$")
+        plt.ylabel(r"$\langle (\Delta y)^2 \rangle/w^2$")
+        plt.text(10*tau, 0.5*msd_y_fit_10, r'$\alpha$ = ' + f'{np.round(a_y, 2)}', ha='left', va='top', fontsize=12)
+        plt.legend(loc='upper left')
+        plt.tight_layout()
+
         plt.show()
 
     def Trajectory(self, data):

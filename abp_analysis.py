@@ -185,6 +185,44 @@ def phase_diagram_vx(filename):
     plt.tight_layout()
     plt.show()
 
+def phase_diagram_alpha(filename):
+    """
+    Construct a phase diagram of the MSD scaling exponent.
+    
+    Arguments:
+        filename: filepath to alpha results
+    """
+    # Read in and interpret data
+    x, y, alpha = np.loadtxt(filename, unpack=True)
+    nx, ny = np.unique(x), np.unique(y)
+    size_x = len(nx)
+    size_y = len(ny)
+    A = alpha.reshape(size_x, size_y).T
+    X, Y = np.meshgrid(nx, ny)
+
+    # Generate labelling
+    title = "MSD$_x$ scaling exponent"
+    label = r'$\alpha$'
+    # Normalise divergent colormap
+    norm_a = colors.TwoSlopeNorm(vmin=A.min(), vcenter=1.5, vmax=A.max())
+
+    # Plot mean longitudinal velocity
+    fig = plt.figure(figsize=[8, 6])
+
+    plt.title(f"{title}")
+    plt.pcolormesh(X, Y, A, cmap='bwr', norm=norm_a, shading='auto')
+    cbar = plt.colorbar(label=label)
+    plt.xlabel("$Pe_s$")
+    plt.ylabel("$Pe_f$")
+
+    # Plot values as text
+    for Ps, Pf, a in zip(x, y, alpha):
+        if Pf == (2 * Ps - 1):
+            plt.text(Ps, Pf, f"{np.round(a, 3)}", ha='center', va='center', fontsize=8)
+
+    plt.tight_layout()
+    plt.show()
+
 def pd3_comparison(filename1, filename2, filename3):
     """
     Plot side-by-side phase diagram comparisons for three datasets.
@@ -648,6 +686,46 @@ def effective_constants(filename):
     plt.tight_layout()
     plt.show()
 
+def Trajectory(filename):
+    """
+    Plot the trajectory of a single particle from its logscale trajectory file.
+    
+    Arguments:
+        filename: logscale trajectory data
+    """     
+    # Read in trajectory data
+    x, y, theta = np.loadtxt(filename, skiprows=1, delimiter=',', unpack=True) 
+    dx = np.cos(theta)
+    dy = np.sin(theta)
+
+    # Retrieve start and end positions
+    start_x = x[0]
+    start_y = y[0]
+    end_x = x[-1]
+    end_y = y[-1]
+
+    fig = plt.figure(figsize=[8, 6])
+
+    # Show start and end points of trajectory
+    plt.scatter(start_x, start_y, color='lime', s=100, marker='*', zorder=1)
+    plt.scatter(end_x, end_y, color='red', s=100, marker='*', zorder=1)
+
+    # Show start and end points of each logscale block
+    plt.scatter(x[::17], y[::17], color='lime', s=10, zorder=0)
+    plt.scatter(x[16::17], y[16::17], color='red', s=10, zorder=0)
+
+    plt.scatter(x, y, color='black', marker='.', s=1, zorder=-1)
+    plt.xlabel(r"$x/w$")
+    plt.ylabel(r"$y/w$")
+    plt.axhline(0, color='black', linestyle='--', alpha=0.5)
+    plt.axhline(1, color='black', linestyle='--', alpha=0.5)
+    
+    # Make quiver plot
+    plt.quiver(x, y, dx, dy, color='blue', width=0.002, headwidth=3, headlength=4, scale=35, zorder=-1)
+
+    plt.tight_layout()
+    plt.show()
+
 if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser()
@@ -655,11 +733,13 @@ if __name__ == "__main__":
     parser.add_argument('-f2', type=str, default=None, help='Filepath to second dataset, if applicable')
     parser.add_argument('-f3', type=str, default=None, help='Filepath to third dataset, if applicable')
     parser.add_argument('--PD', action='store_true', help='Construct the phase diagram')
-    parser.add_argument('--PDA', action='store_true', help='Construct the alternative phase diagram')
+    parser.add_argument('--PDalt', action='store_true', help='Construct the alternative phase diagram')
     parser.add_argument('--PD3', action='store_true', help='Compare the phase diagrams of systems with/without shear, vorticity')
     parser.add_argument('--PDX', action='store_true', help='Compare the phase diagrams of alpha for total and longitudinal displacement')
     parser.add_argument('--PDVX', action='store_true', help='Construct a phase diagram for the mean longitudinal velocity only')
+    parser.add_argument('--PDA', action='store_true', help='Construct a phase diagram for the MSD scaling exponent only')
     parser.add_argument('-F', type=str, default=None, help='Folder containing data files')
+    parser.add_argument('--trajectory', action='store_true', help="Plot trajectory from logscale data file")
     parser.add_argument('--hist', action='store_true', help='Construct histograms from saved data')
     parser.add_argument('--TTD', action='store_true', help='Display the trapping time distribution')
     parser.add_argument('--TTD3', action='store_true', help='Display the trapping time distribution for three phases')
@@ -669,10 +749,12 @@ if __name__ == "__main__":
 
     if args.PD:
         phase_diagram(args.f1)
-    elif args.PDA:
+    elif args.PDalt:
         phase_diagram_alt(args.f1)
     elif args.PDVX:
         phase_diagram_vx(args.f1)
+    elif args.PDA:
+        phase_diagram_alpha(args.f1)
     if args.PD3:
         pd3_comparison(args.f1, args.f2, args.f3)
     if args.PDX:
@@ -687,3 +769,5 @@ if __name__ == "__main__":
         FPTD(args.f1)
     if args.eff:
         effective_constants(args.f1)
+    if args.trajectory:
+        Trajectory(args.f1)

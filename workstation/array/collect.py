@@ -2,6 +2,11 @@ import numpy as np
 from pathlib import Path
 import argparse
 
+NBLOCKS = 125       # Number of logscale blocks
+NCONFIGS = 17       # Number of measurements per block
+N = 1000            # Number of particles
+BLOCKSIZE = 80000   # Number of timesteps per block
+
 def collect_mean_vx(input, output, Ps, timechain, dt):
     """
     Calculate the mean instantaneous longitudinal velocity for a given combination of
@@ -104,7 +109,98 @@ def mean_vx_to_file(input, output, Ps_params, Pf_params):
         # Append to output file
         with open(output, "a") as f:
             f.write(f"{Ps} {Pf} {vx}\n")
+
+def get_powerlaw(t, msd, l):
+    """
+    Obtain the late-time power-law dependence of the MSD.
     
+    Argument:
+        t: measurement times
+        msd: mean square displacements
+        l: when to start counting late-time data
+    
+    Returns:
+        a: fitted power
+        b: fitted logarithm of prefactor
+    """
+    # Consider only very late times
+    late = t >= l
+    # Take the logarithms of time and MSD
+    y = np.log(msd[late])
+    x = np.log(t[late])
+    # Fit to a 1st degree polynomial
+    a, b = np.polyfit(x, y, 1)
+    # return fitted parameters
+    return a, b
+
+def collect_alpha(input, output, Ps_params, Pf_params, late):
+    """
+    Calculate the MSD scaling exponent (alpha) by fitting a power-law to the 
+    late-time (t > 1000) MSD data. Save to file.
+    
+    Arguments:
+        input: directory containing the MSD files for each point in Peclet number-space
+        output: file to save the resulting scaling exponent
+        Ps_params: file containing swim Peclet numbers
+        Pf_params: file containing flow Peclet numbers
+        late: when to consider data as 'late-time'
+    """
+    # Read in Peclet number lists
+    Ps_list = np.loadtxt(Ps_params, dtype=str)
+    Pf_list = np.loadtxt(Pf_params, dtype=str)
+
+    # Write header to file
+    with open(output, 'w') as f:
+        f.write("# Ps Pf alpha\n")
+
+    # Iterate over each point in phase space
+    for Ps, Pf in zip(Ps_list, Pf_list):
+        # Read in MSD data
+        input_file = f"{input}/{Ps} {Pf}.txt"
+        t, msd = np.loadtxt(input_file, unpack=True)
+        # Calculate alpha
+        alpha, _ = get_powerlaw(t, msd, late)
+        # Write to file
+        with open(output, 'a') as f:
+            f.write(f"{Ps} {Pf} {alpha}\n")
+
+def collect_trajectories(folder, sample, Ps, Pf):
+    """
+    Extract the displacements along the x-direction for a sample number of particles, for a
+    given point in Peclet number space. Save to file.
+    
+    Arguments:
+        folder: directory containing all N trajectories for a given set of Peclet numbers
+        sample: how many trajectories to sample from the folder
+        Ps: swim Peclet number
+        Pf: flow Peclet number
+    """
+    # Initialise empty data array
+    data = np.empty((sample, NBLOCKS * NCONFIGS))
+    
+    # Verify existence of specified directory
+    folder = Path(folder)
+
+    if not folder.exists():
+        raise FileNotFoundError(f"Directory does not exist: {folder}")
+
+    # Sort raw trajectory files
+    files = sorted(folder.glob("*.txt"))
+
+    # Iterate over each particle
+    for n, file in enumerate(files):
+        # Read data from file
+        d = np.loadtxt(file, delimiter=',', skiprows=1, usecols=0)
+        # Insert into data array
+        data[n] = d
+        # Break after retrieving sample trajectories 
+        if n == sample - 1:
+            break
+
+    # Save to npz file
+    filename = f"trajs {Ps} {Pf}.npz"
+    np.savez(filename, x=data)
+
 
 if __name__ == "__main__":
     # Parse command line arguments
@@ -119,9 +215,13 @@ if __name__ == "__main__":
     parser.add_argument('-tc', type=str, help='Filepath to the logscale timechain file')
     parser.add_argument('-dt', type=float, default=0.001, help='Simulation timestep')
     parser.add_argument('-o', type=str, help='Name of output file')
+    parser.add_argument('--alpha', action='store_true', help="Collect entire set of MSD scaling exponents")
+    parser.add_argument('-l', type=int, default=1000, help="Late-time data start")
     args = parser.parse_args()
 
     if args.VX:
         collect_mean_vx(args.i, args.o, args.Ps, args.tc, args.dt)
     elif args.VXf:
         mean_vx_to_file(args.i, args.o, args.PsL, args.PfL)
+    elif args.alpha:
+        collect_alpha(args.i, args.o, args.PsL, args.PfL, args.l)

@@ -24,6 +24,7 @@ noise_r = 1
 arrow_spacing = 100
 centre_start = False
 show_traps = True
+show_arrows = False
 
 @njit
 def run(N, r, e, T, dt, Ps, D, Pf, G):
@@ -406,7 +407,9 @@ class ABP:
         # Create array of measurement times
         t = np.arange(1, self.T + 1) * self.dt
         # Consider only late-time data, i.e. >> tau
-        if self.T >= 1000000:
+        if self.T >= 10000000:
+            late = t >= 1000 * tau
+        elif self.T >= 1000000:
             late = t >= 100 * tau
         else:
             late = t >= 10 * tau
@@ -475,24 +478,6 @@ class ABP:
         # Calculate MSD at t = 10*tau
         msd_fit_10 = B * (10*tau)**a
 
-        # Plot MSD with fit and theory lines
-        fig = plt.figure(figsize=[8, 6])
-        plt.title(f"MSD: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
-        plt.scatter(t, msd, color='black', marker='.', s=10, label='simulation')
-        plt.loglog(t, msd_theory, color='red', linestyle='--', label='theory')
-        plt.loglog(t, msd_b, color='blue', linestyle='--', label='ballistic')
-        plt.loglog(t, msd_d, color='green', linestyle='--', label='diffusive')
-        plt.loglog(t_fit, msd_fit, color='magenta', label=r'$\sim t^{\alpha}$')
-        plt.axvline(tau, color='black', linestyle='dotted', label=r'$t=\tau_r$')
-        plt.xlabel("$tD_r$")
-        plt.ylabel(r"$\langle (\Delta r)^2 \rangle/w^2$")
-        if a < 1.5:
-            plt.text(10*tau, 0.75*msd_fit_10, r'$\alpha$ = ' + f'{np.round(a, 2)}\n' + r'$D_{\mathrm{eff}}$ = ' + f'{np.round(B/2/d, 2)}', ha='left', va='top', fontsize=12)
-        else:
-            plt.text(10*tau, 0.75*msd_fit_10, r'$\alpha$ = ' + f'{np.round(a, 2)}\n' + r'$Pe_{s,\mathrm{eff}}$ = ' + f'{np.round(np.sqrt(B), 2)}', ha='left', va='top', fontsize=12)
-        plt.legend(loc='upper left')
-        plt.tight_layout()
-
         # Calculate MSD in the x-direction and line of best fit fit
         msd_x = msd_xy[:, 0]
         a_x, b_x = self.get_powerlaw(msd_x)
@@ -504,9 +489,9 @@ class ABP:
         fig = plt.figure(figsize=[8, 6])
         plt.title(f"MSD$_x$: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
         plt.scatter(t, msd_x, color='black', marker='.', s=10, label='simulation')
-        plt.loglog(t, msd_theory/2, color='red', linestyle='--', label='theory')
-        plt.loglog(t, msd_b/2, color='blue', linestyle='--', label='ballistic')
-        plt.loglog(t, msd_d/2, color='green', linestyle='--', label='diffusive')
+        plt.loglog(t, msd_theory/2, color='red', linestyle='--', label='theory (no flow)')
+        plt.loglog(t, msd_b/2, color='blue', linestyle='--', label='ballistic limit')
+        plt.loglog(t, msd_d/2, color='green', linestyle='--', label='diffusive limit')
         plt.loglog(t_fit, msd_x_fit, color='magenta', label=r'$\sim t^{\alpha}$')
         plt.axvline(tau, color='black', linestyle='dotted', label=r'$t=\tau_r$')
         plt.xlabel("$tD_r$")
@@ -515,28 +500,6 @@ class ABP:
             plt.text(10*tau, 0.75*msd_x_fit_10, r'$\alpha$ = ' + f'{np.round(a_x, 2)}\n' + r'$D_{\mathrm{eff}}$ = ' + f'{np.round(B_x/2, 2)}', ha='left', va='top', fontsize=12)
         else:
             plt.text(10*tau, 0.75*msd_x_fit_10, r'$\alpha$ = ' + f'{np.round(a_x, 2)}\n' + r'$Pe_{s,\mathrm{eff}}$ = ' + f'{np.round(np.sqrt(B_x), 2)}', ha='left', va='top', fontsize=12)
-        plt.legend(loc='upper left')
-        plt.tight_layout()
-
-        # Calculate MSD in the y-direction and line of best fit fit
-        msd_y = msd_xy[:, 1]
-        a_y, b_y = self.get_powerlaw(msd_y)
-        B_y = np.exp(b_y)
-        msd_y_fit = B_y * t_fit**a_y
-        # Calculate MSD at t = 10*tau
-        msd_y_fit_10 = B_y * (10*tau)**a_y
-
-        fig = plt.figure(figsize=[8, 6])
-        plt.title(f"MSD$_y$: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
-        plt.scatter(t, msd_y, color='black', marker='.', s=10, label='simulation')
-        plt.loglog(t, msd_theory/2, color='red', linestyle='--', label='theory')
-        plt.loglog(t, msd_b/2, color='blue', linestyle='--', label='ballistic')
-        plt.loglog(t, msd_d/2, color='green', linestyle='--', label='diffusive')
-        plt.loglog(t_fit, msd_y_fit, color='magenta', label=r'$\sim t^{\alpha}$')
-        plt.axvline(tau, color='black', linestyle='dotted', label=r'$t=\tau_r$')
-        plt.xlabel("$tD_r$")
-        plt.ylabel(r"$\langle (\Delta y)^2 \rangle/w^2$")
-        plt.text(10*tau, 0.5*msd_y_fit_10, r'$\alpha$ = ' + f'{np.round(a_y, 2)}', ha='left', va='top', fontsize=12)
         plt.legend(loc='upper left')
         plt.tight_layout()
 
@@ -637,27 +600,28 @@ class ABP:
         plt.tight_layout()
 
         # Show trajectory with orientation directions overlaid
-        fig = plt.figure(figsize=[8, 6])
-        plt.title(f"Trajectory: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
-        
-        # Show start and end points
-        plt.scatter(start_x, start_y, color='lime', s=20, zorder=1)
-        plt.scatter(end_x, end_y, color='red', s=20, zorder=1)
+        if show_arrows:
+            fig = plt.figure(figsize=[8, 6])
+            plt.title(f"Trajectory: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
+            
+            # Show start and end points
+            plt.scatter(start_x, start_y, color='lime', s=20, zorder=1)
+            plt.scatter(end_x, end_y, color='red', s=20, zorder=1)
 
-        #plt.scatter(x, y, color='black', marker='.', s=1, zorder=-1)
-        plt.plot(x, y, color='black', zorder=-1)
-        plt.xlabel(r"$x/w$")
-        plt.ylabel(r"$y/w$")
-        plt.axhline(0, color='black', linestyle='--', alpha=0.5)
-        plt.axhline(1, color='black', linestyle='--', alpha=0.5)
-        # Create array of arrow directions
-        dx, dy = dx[::arrow_spacing], dy[::arrow_spacing]
-        # Create array of arrow bases
-        X, Y = x[::arrow_spacing], y[::arrow_spacing]
-        # Make quiver plot
-        plt.quiver(X, Y, dx, dy, color='red', width=0.002, headwidth=3, headlength=4, scale=25, zorder=-1)
-        
-        plt.tight_layout()
+            #plt.scatter(x, y, color='black', marker='.', s=1, zorder=-1)
+            plt.plot(x, y, color='black', zorder=-1)
+            plt.xlabel(r"$x/w$")
+            plt.ylabel(r"$y/w$")
+            plt.axhline(0, color='black', linestyle='--', alpha=0.5)
+            plt.axhline(1, color='black', linestyle='--', alpha=0.5)
+            # Create array of arrow directions
+            dx, dy = dx[::arrow_spacing], dy[::arrow_spacing]
+            # Create array of arrow bases
+            X, Y = x[::arrow_spacing], y[::arrow_spacing]
+            # Make quiver plot
+            plt.quiver(X, Y, dx, dy, color='red', width=0.002, headwidth=3, headlength=4, scale=25, zorder=-1)
+            plt.tight_layout()
+
         plt.show()
     
     def FPTD(self, data, target):
