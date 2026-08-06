@@ -98,7 +98,7 @@ def plot_velocities(G, Ps_params, Pf_params):
         plt.stairs(pdf, edges, color=colour, label=f"$Pe_s$ = {Ps}, $Pe_f$ = {Pf}, " + r"$\overline{v}_x \approx$ " + f"{mode_v}")
 
     # Display figure
-    plt.legend(loc='upper left')
+    plt.legend()
     plt.tight_layout()
     plt.show()
 
