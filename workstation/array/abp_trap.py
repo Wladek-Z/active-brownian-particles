@@ -10,6 +10,7 @@ import random
 from pathlib import Path
 import time
 import sys
+import os
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
@@ -21,7 +22,6 @@ d = 2
 tau = 1 / (d - 1)
 vorticity = 1
 noise_r = 1
-centre_start = False
 
 @njit
 def update(N, r, theta, dt, Ps, D, Pf, G, T_timer, B_timer):
@@ -125,29 +125,50 @@ def orientation(theta, dt, Pf, y, G):
     # Return the new angle wrapped to [-pi, pi]
     return (new_theta + np.pi) % (2 * np.pi) - np.pi
 
-@njit
-def positions(N):
+def read_configurations(folder, N):
     """
-    Generate the positions of N particles near the beginning of a channel.
+    Read final configurations from raw logscale trajectories in a directory pertaining to
+    a specific combination of swim and flow Peclet numbers.
     
     Arguments:
+        folder: directory containing raw trajectory files
         N: number of particles
     
     Returns:
-        r: positions of each particle
+        r: ABP positions
+        e: ABP orientations
     """
-    x_min = -0.25
-    x_max = 0.25
-    y_min = 0.25
-    y_max = 0.75
-    # Initialise positions
+    # Initialise positions/orientations
     r = np.zeros((N, 2))
-    # Randomly choose x and y components within specified range
+    e = np.zeros((N, 2))
+
+    # Iterate over each file in directory
     for i in range(N):
-        r[i, 0] = random.uniform(x_min, x_max)
-        r[i, 1] = random.uniform(y_min, y_max)
-    # Return position array
-    return r
+        # Resolve filepath
+        filename = f"{folder}/{i}.txt"
+
+        # Read in last line of data
+        with open(filename, 'rb') as f:
+            try:  # catch OSError in case of a one line file 
+                f.seek(-2, os.SEEK_END)
+                while f.read(1) != b'\n':
+                    f.seek(-2, os.SEEK_CUR)
+            except OSError:
+                f.seek(0)
+            last_line = f.readline().decode()
+
+        # Retrieve position and orientation from last line
+        x, y, theta = last_line.split(',')
+        # Assign x and y to position vector
+        r[i, 0] = x
+        r[i, 1] = y
+        # Obtain orientation vector from angle
+        e[i, 0] = np.cos(theta)
+        e[i, 1] = np.sin(theta)
+
+    # Return configuration of ABPs
+    return r, e
+        
 
 class ABPTrap:
     """
@@ -155,9 +176,10 @@ class ABPTrap:
     bulk times are stored by this program.
     """
 
-    def __init__(self, N, T, dt, Ps, D, Pf, G):
+    def __init__(self, N, T, dt, Ps, D, Pf, G, configs):
         """
-        Initialise N realisations of the same particle at the origin with random orientations.
+        Initialise N realisations of the ABP starting from the final configurations of the 10M timestep
+        logscale trajectories.
         
         Arguments:
             N: number of realisations of the particle
@@ -167,6 +189,7 @@ class ABPTrap:
             D: diffusion number
             Pf: flow Peclet number
             G: geometrical elongation factor
+            configs: directory containing the logscale trajectories
         """
         # Initialise variables
         self.N = N
@@ -178,15 +201,8 @@ class ABPTrap:
         self.G = G
         self.step = int(1 / dt)
 
-        # Initialise starting positions/orientations
-        if centre_start:
-            self.r = np.full((N, 2), [0, 0.5])
-            self.e = np.full((N, 2), [1/np.sqrt(2), 1/np.sqrt(2)])
-        else:
-            self.r = positions(N)
-            # Initialise orientation vector of each particle from a uniform rotationally symmetric distribution
-            distribution = uniform_direction(2)
-            self.e = distribution.rvs(N)
+        # Initialise starting positions/orientations from final configuration of logscale trajectories
+        self.r, self.e = read_configurations(configs, N)
         
  
     def Run(self, trap_file, bulk_file):
@@ -252,16 +268,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-N', type=int, default=1000, help='Number of realisations of the ABP')
     parser.add_argument('-dt', type=float, default=0.001, help='Simulation timestep')
-    parser.add_argument('-T', type=int, default=10000000, help='Number of timesteps over which to run the simulation')
+    parser.add_argument('-T', type=int, default=100000, help='Number of timesteps over which to run the simulation')
     parser.add_argument('-Ps', type=float, default=5, help='Swim Peclet number')
     parser.add_argument('-Pf', type=float, default=5, help='Flow Peclet number')
     parser.add_argument('-D', type=float, default=0.01, help='Dimensionless ratio of diffusion constants')
     parser.add_argument('-G', type=float, default=0, help='Geometrical factor related to particle aspect ratio')
     parser.add_argument('-ttd', type=str, default=None, help="Filepath to store the output ttd data")
     parser.add_argument('-btd', type=str, default=None, help="Filepath to store the output btd data")
+    parser.add_argument('-c', type=str, help="Directory containing logscale trajectories to read final ABP configurations")
     args = parser.parse_args()
 
     # Create ABP (trapping/bulk times) object
-    abp = ABPTrap(args.N, args.T, args.dt, args.Ps, args.D, args.Pf, args.G)
+    abp = ABPTrap(args.N, args.T, args.dt, args.Ps, args.D, args.Pf, args.G, args.c)
     # Run simulation
     abp.Run(args.ttd, args.btd)
