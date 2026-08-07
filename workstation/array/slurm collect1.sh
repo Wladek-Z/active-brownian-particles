@@ -12,10 +12,10 @@ G=1
 x=$1
 y=$2
 
-output="G ${G} results/velocities"
+output="G ${G} results/x trajectories"
 mkdir -p "${output}"
 
 echo "Task $SLURM_JOB_ID: Ps=$x Pf=$y"
 
 source ../.venv/bin/activate
-python collect.py -i "G ${G}/${x} ${y}" -Ps $x --velocities -o "${output}/v_hist ${x} ${y}.txt"
+python collect.py -i "G ${G}/${x} ${y}" -Ps $x --trajectory -o "${output}/trajs ${x} ${y}.npz" -s 20 -Pf $y
