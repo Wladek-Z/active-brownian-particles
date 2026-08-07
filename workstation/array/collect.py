@@ -182,16 +182,48 @@ def collect_alpha(input, output, Ps_params, Pf_params, late):
         with open(output, 'a') as f:
             f.write(f"{Ps} {Pf} {alpha}\n")
 
-def collect_trajectories(folder, sample, Ps, Pf, output):
+def collect_beta_Deff(input, output, Ps_params, Pf_params, late):
     """
-    Extract the displacements along the x-direction for a sample number of particles, for a
-    given point in Peclet number space. Save to file.
+    Calculate the variance scaling exponent (beta) and the effective diffusivity
+    by fitting a power-law to the late-time (t > 1000) variance data for all points on
+    the phase diagram. Save to file.
+    
+    Arguments:
+        input: directory containing the variance files
+        output: file to save the resulting scaling exponents, effective diffusivities
+        Ps_params: file containing swim Peclet numbers
+        Pf_params: file containing flow Peclet numbers
+        late: when to consider data as 'late-time'
+    """
+    # Read in Peclet number lists
+    Ps_list = np.loadtxt(Ps_params, dtype=str)
+    Pf_list = np.loadtxt(Pf_params, dtype=str)
+
+    # Write header to file
+    with open(output, 'w') as f:
+        f.write("# Ps Pf beta Deff\n")
+
+    # Iterate over each point in phase space
+    for Ps, Pf in zip(Ps_list, Pf_list):
+        # Read in variance data
+        input_file = f"{input}/{Ps} {Pf}.txt"
+        t, var = np.loadtxt(input_file, unpack=True)
+        # Fit parameters to data
+        beta, C = get_powerlaw(t, var, late)
+        # Calculate diffusivity (x-direction)
+        D_eff = np.exp(C) / 2
+        # Write results to file
+        with open(output, 'a') as f:
+            f.write(f"{Ps} {Pf} {beta} {D_eff}\n")
+
+def collect_trajectories(folder, sample, output):
+    """
+    Extract the displacements along the x-direction for a sample number of particles from a
+    directory containing the trajectories for ABPs at a single point in phase space.
     
     Arguments:
         folder: directory containing all N trajectories for a given set of Peclet numbers
         sample: how many trajectories to sample from the folder
-        Ps: swim Peclet number
-        Pf: flow Peclet number
         output: name of output file
     """
     # Initialise empty data array
@@ -234,6 +266,7 @@ if __name__ == "__main__":
     parser.add_argument('-dt', type=float, default=0.001, help='Simulation timestep')
     parser.add_argument('-o', type=str, help='Name of output file')
     parser.add_argument('--alpha', action='store_true', help="Collect entire set of MSD scaling exponents")
+    parser.add_argument('--beta', action='store_true', help="Collect entire set of variance scaling exponents & effective diffusivities")
     parser.add_argument('-l', type=int, default=1000, help="Late-time data start")
     parser.add_argument('-s', type=int, default=1000, help="Number of samples to take from raw data")
     parser.add_argument('--trajectory', action='store_true', help="Collect the trajectories of a number of particles")
@@ -246,6 +279,8 @@ if __name__ == "__main__":
         mean_vx_to_file(args.i, args.o, args.PsL, args.PfL)
     elif args.alpha:
         collect_alpha(args.i, args.o, args.PsL, args.PfL, args.l)
+    elif args.beta:
+        collect_beta_Deff(args.i, args.o, args.PsL, args.PfL, args.l)
     elif args.trajectory:
         collect_trajectories(args.i, args.s, args.Ps, args.Pf, args.o)
     elif args.velocities:
