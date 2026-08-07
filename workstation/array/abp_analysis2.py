@@ -103,7 +103,7 @@ def plot_velocities(G, Ps_params, Pf_params):
     plt.show()
 
 
-def TD3(G, filename1, filename2, filename3, btd):
+def plot_TD3(G, filename1, filename2, filename3, btd):
     """
     Plot the trapping time distributions of three different phase points on one graph.
     
@@ -122,33 +122,31 @@ def TD3(G, filename1, filename2, filename3, btd):
     else:
         td_text = ["ttd", "Trapping"]
 
-    # Read parameters and trapping/bulk times from first datafile
-    Ps1, string = filename1.split(' ')
-    Pf1 = string.split('.txt')[0]
-    data1 = np.loadtxt(f"G {G} results/{td_text[0]} data/{filename1}", dtype=float)
-    
+    def read_data(filename):
+        # Read parameters and trapping/bulk times from datafile
+        Ps, string = filename.split(' ')
+        Pf = string.split('.txt')[0]
+        data = np.loadtxt(f"G {G} results/{td_text[0]} data/{filename}", dtype=float)
+        return Ps, Pf, data
+
+    # Read parameters and trapping/bulk times from datafiles
+    Ps1, Pf1, data1 = read_data(filename1)
+    Ps2, Pf2, data2 = read_data(filename2)
+    Ps3, Pf3, data3 = read_data(filename3)
+
     # Construct first histogram
     counts1, bins = np.histogram(data1, bins=num_bins, density=True)
     bin_centres1 = (bins[:-1] + bins[1:]) / 2
-
-    # Read parameters and trapping/bulk times from second datafile
-    Ps2, string = filename2.split(' ')
-    Pf2 = string.split('.txt')[0]
-    data2 = np.loadtxt(f"G {G} results/{td_text[0]} data/{filename2}", dtype=float)
 
     # Construct second histogram
     counts2, bins = np.histogram(data2, bins=num_bins, density=True)
     bin_centres2 = (bins[:-1] + bins[1:]) / 2
 
-    # Read parameters and trapping/bulk times from third datafile
-    Ps3, string = filename3.split(' ')
-    Pf3 = string.split('.txt')[0]
-    data3 = np.loadtxt(f"G {G} results/{td_text[0]} data/{filename3}", dtype=float)
-
     # Construct third histogram
     counts3, bins = np.histogram(data3, bins=num_bins, density=True)
     bin_centres3 = (bins[:-1] + bins[1:]) / 2
 
+    # Generate figure title and labels
     title = f"{td_text[1]} time distributions: $G$ = {G}"
     label1 = f'$Pe_s$ = {Ps1}, $Pe_f$ = {Pf1}'
     label2 = f'$Pe_s$ = {Ps2}, $Pe_f$ = {Pf2}'
