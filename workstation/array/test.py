@@ -3,9 +3,9 @@ import numpy as np
 import os
 
 
-filename = 'tester.txt'
+filename = '0.25 0.5.txt'
 
-open(filename, 'w')
+Ps, string = filename.split(' ')
+Pf = string.split('.txt')[0]
 
-with open(filename, 'a') as f:
-    f.write("goodbye")
+print(f"Ps = {Ps}, Pf = {Pf}")
