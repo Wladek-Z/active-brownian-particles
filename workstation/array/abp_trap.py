@@ -160,11 +160,11 @@ def read_configurations(folder, N):
         # Retrieve position and orientation from last line
         x, y, theta = last_line.split(',')
         # Assign x and y to position vector
-        r[i, 0] = x
-        r[i, 1] = y
+        r[i, 0] = float(x)
+        r[i, 1] = float(y)
         # Obtain orientation vector from angle
-        e[i, 0] = np.cos(theta)
-        e[i, 1] = np.sin(theta)
+        e[i, 0] = np.cos(float(theta))
+        e[i, 1] = np.sin(float(theta))
 
     # Return configuration of ABPs
     return r, e
