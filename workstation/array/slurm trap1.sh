@@ -1,8 +1,8 @@
 #!/bin/bash
 
-#SBATCH --partition medium
+#SBATCH --partition short
 #SBATCH --mem-per-cpu 2G
-#SBATCH --time 12:00:00
+#SBATCH --time 2:00:00
 #SBATCH --job-name ABP
 #
 #######################################
@@ -18,4 +18,4 @@ mkdir -p "G ${G} results/ttd data"
 mkdir -p "G ${G} results/btd data"
 
 source ../.venv/bin/activate
-python abp_trap.py -Ps $x -Pf $y -G $G -ttd "G ${G} results/ttd data/${x} ${y}.txt" -btd "G ${G} results/btd data/${x} ${y}.txt"
+python abp_trap.py -Ps $x -Pf $y -G $G -ttd "G ${G} results/ttd data/${x} ${y}.txt" -btd "G ${G} results/btd data/${x} ${y}.txt" -c "G ${G}/${x} ${y}"
