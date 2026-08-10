@@ -206,7 +206,7 @@ def phase_diagram_alpha(filename):
     # Normalise divergent colormap
     norm_a = colors.TwoSlopeNorm(vmin=A.min(), vcenter=1.5, vmax=A.max())
 
-    # Plot mean longitudinal velocity
+    # Plot MSD scaling exponent
     fig = plt.figure(figsize=[8, 6])
 
     plt.title(f"{title}")
@@ -221,6 +221,57 @@ def phase_diagram_alpha(filename):
             plt.text(Ps, Pf, f"{np.round(a, 3)}", ha='center', va='center', fontsize=8)
 
     plt.tight_layout()
+    plt.show()
+
+def phase_diagram_beta_Deff(filename):
+    """
+    Construct a phase diagram of the variance scaling exponent and the effective diffusivity.
+    
+    Arguments:
+        filename: filepath to beta/D_eff results
+    """
+    # Read in and interpret data
+    x, y, beta, Deff = np.loadtxt(filename, unpack=True)
+    nx, ny = np.unique(x), np.unique(y)
+    size_x = len(nx)
+    size_y = len(ny)
+    B = beta.reshape(size_x, size_y).T
+    D_eff = Deff.reshape(size_x, size_y).T
+    X, Y = np.meshgrid(nx, ny)
+
+    # Define phase diagram plotting function
+    def plot(data, cmap, norm, title, label):
+        fig = plt.figure(figsize=[8, 6])
+        plt.title(f"{title}")
+        plt.pcolormesh(X, Y, data, cmap=cmap, norm=norm, shading='auto')
+        cbar = plt.colorbar(label=label)
+        plt.xlabel("$Pe_s$")
+        plt.ylabel("$Pe_f$")
+        plt.tight_layout()
+        return fig
+    
+    # Generate labelling for beta
+    title_b = r"Var($\Delta x$) scaling exponent"
+    label_b = r'$\beta$'
+    # Normalise divergent colormap
+    norm_b = colors.TwoSlopeNorm(vmin=B.min(), vcenter=1, vmax=B.max())
+    # Plot variance scaling exponent
+    plot(B, 'bwr', norm_b, title_b, label_b)
+    # Plot values as text
+    for Ps, Pf, b in zip(x, y, beta):
+        if Pf == (2 * Ps - 1):
+            plt.text(Ps, Pf, f"{np.round(b, 3)}", ha='center', va='center', fontsize=8)
+
+    # Generate labelling for Deff
+    title_d = r"Effective diffusivity"
+    label_d = r'$D_{\mathrm{eff}}$'
+    # Plot variance scaling exponent
+    plot(D_eff, 'rainbow', 'log', title_d, label_d)
+    # Plot values as text
+    for Ps, Pf, deff in zip(x, y, Deff):
+        if Pf == (2 * Ps - 1):
+            plt.text(Ps, Pf, f"{np.round(deff, 3)}", ha='center', va='center', fontsize=8)
+
     plt.show()
 
 def pd3_comparison(filename1, filename2, filename3):
@@ -738,6 +789,7 @@ if __name__ == "__main__":
     parser.add_argument('--PDX', action='store_true', help='Compare the phase diagrams of alpha for total and longitudinal displacement')
     parser.add_argument('--PDVX', action='store_true', help='Construct a phase diagram for the mean longitudinal velocity only')
     parser.add_argument('--PDA', action='store_true', help='Construct a phase diagram for the MSD scaling exponent only')
+    parser.add_argument('--PDB', action='store_true', help='Construct a phase diagram for the bariance scaling exponent and effective diffusivity only')
     parser.add_argument('-F', type=str, default=None, help='Folder containing data files')
     parser.add_argument('--trajectory', action='store_true', help="Plot trajectory from logscale data file")
     parser.add_argument('--hist', action='store_true', help='Construct histograms from saved data')
@@ -755,6 +807,8 @@ if __name__ == "__main__":
         phase_diagram_vx(args.f1)
     elif args.PDA:
         phase_diagram_alpha(args.f1)
+    elif args.PDB:
+        phase_diagram_beta_Deff(args.f1)
     if args.PD3:
         pd3_comparison(args.f1, args.f2, args.f3)
     if args.PDX:

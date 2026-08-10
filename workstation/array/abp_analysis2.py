@@ -201,4 +201,4 @@ if __name__ == "__main__":
     elif args.velocities:
         plot_velocities(args.G, args.PsL, args.PfL)
     elif args.TTD3 or args.BTD3:
-        TD3(args.G, args.f1, args.f2, args.f3, args.BTD3)
+        plot_TD3(args.G, args.f1, args.f2, args.f3, args.BTD3)
