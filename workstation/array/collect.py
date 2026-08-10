@@ -282,6 +282,6 @@ if __name__ == "__main__":
     elif args.beta:
         collect_beta_Deff(args.i, args.o, args.PsL, args.PfL, args.l)
     elif args.trajectory:
-        collect_trajectories(args.i, args.s, args.Ps, args.Pf, args.o)
+        collect_trajectories(args.i, args.s, args.o)
     elif args.velocities:
         collect_velocities(args.i, args.o, args.Ps, args.dt)

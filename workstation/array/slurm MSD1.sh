@@ -9,7 +9,7 @@
 
 G=1
 offset=0
-output="G ${G} results/MSD o${offset}"
+output="G ${G} results/MSD ind"
 
 x=$1
 y=$2
@@ -19,4 +19,4 @@ mkdir -p "${output}"
 echo "Task $SLURM_JOB_ID: Ps=$x Pf=$y"
 
 source ../.venv/bin/activate
-python 'get stats.py' --MSD -F "G ${G}/${x} ${y}" -Ps $x -Pf $y -o "${output}" -off ${offset} -tc timechain10000000.txt -f "lags o${offset}.npz"
+python 'get stats.py' --ppMSD -s 20 -F "G ${G}/${x} ${y}" -o "${output}/${x} ${y}" -off ${offset} -f "lags o${offset}.npz"

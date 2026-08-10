@@ -18,4 +18,4 @@ mkdir -p "${output}"
 echo "Task $SLURM_JOB_ID: Ps=$x Pf=$y"
 
 source ../.venv/bin/activate
-python collect.py -i "G ${G}/${x} ${y}" -Ps $x --trajectory -o "${output}/trajs ${x} ${y}.npz" -s 20 -Pf $y
+python collect.py -i "G ${G}/${x} ${y}" --trajectory -s 20 -o "${output}/trajs ${x} ${y}.npz"
