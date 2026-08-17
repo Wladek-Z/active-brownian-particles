@@ -103,7 +103,7 @@ def update_OLD(N, r, theta, dt, Ps, D, Pf, G, T_timer, B_timer):
         return r_new, theta_new, t_timer, b_timer, trap_times, bulk_times
 
 @njit
-def update(N, r, theta, dt, Ps, D, Pf, G, T_timer, B_timer):
+def update(N, r, theta, dt, Ps, D, Pf, G, T_timer):
         """
         Update the positions and orientations of each particle, track traps.
         
@@ -116,15 +116,13 @@ def update(N, r, theta, dt, Ps, D, Pf, G, T_timer, B_timer):
             D: effective diffusivity
             Pf: flow Peclet number
             G: elongation factor
-            T_timer: timer for tracking traps per particle
-            B_timer: timer for tracking bulk swimming per particle
+            T_timer: timer for tracking traps
 
         Returns:
             r_new: updated positions
             theta_new: updated orientations
             t_timer: increments for trapping timer
-            trap_times: trapping times per particle
-            bulk_times: times in the bulk per particle
+            trap_complete: True if particle escapes trap
             is_bulk: True for particles in the bulk
         """
         # Initialise updated position/orientation variables
@@ -134,12 +132,11 @@ def update(N, r, theta, dt, Ps, D, Pf, G, T_timer, B_timer):
         bottom = 0.05
         top = 0.95
         min_time = 100
-        # Initialise trapping/bulk time arrays in case of successful trap/bulk path completion
-        trap_times = np.full(N, np.nan)
-        bulk_times = np.full(N, np.nan)
-        # Return truth element if particle is not in trap
+        # Check status if particle escapes trap
+        trap_complete = np.full(N, False)
+        # Check status if particle is in bulk
         is_bulk = np.full(N, False)
-        # Initialise incremental trap timers
+        # Initialise incremental trap timer
         t_timer = np.zeros(N)
 
         # Iterate over every particle
@@ -170,14 +167,13 @@ def update(N, r, theta, dt, Ps, D, Pf, G, T_timer, B_timer):
             if (y_old == y and T_timer[i] == 0) or (T_timer[i] > 0 and (bottom >= y or y >= top)):
                 t_timer[i] += 1
             elif T_timer[i] > min_time and (bottom <= y <= top):
-                trap_times[i] = T_timer[i] * dt
-                bulk_times[i] = (B_timer[i] - T_timer[i]) * dt
+                trap_complete[i] = True
             else:
                 is_bulk[i] = True
             
             
         # Return updated position and orientations
-        return r_new, theta_new, t_timer, trap_times, bulk_times, is_bulk
+        return r_new, theta_new, t_timer, trap_complete, is_bulk
 
 @njit
 def orientation(theta, dt, Pf, y, G):
@@ -306,7 +302,7 @@ class ABPTrap:
         # Perform T iterations of the update procedure
         for i in range(1, self.T+1):
             # Update position and orientation
-            r, theta, t_timer, traps, bulks, is_bulk = update(self.N, 
+            r, theta, t_timer, trap_complete, is_bulk = update(self.N, 
                                                               r, 
                                                               theta, 
                                                               self.dt, 
@@ -314,25 +310,24 @@ class ABPTrap:
                                                               self.D, 
                                                               self.Pf, 
                                                               self.G, 
-                                                              T_timer, 
-                                                              B_timer)
+                                                              T_timer)
 
             # Iterate over each particle and write trapping/bulk times to file, reset timers
             for n in range(self.N):
                 # Check for trap completion
-                if not np.isnan(traps[n]):
-                    # Save time to file
+                if trap_complete[n]:
+                    # Save trap time to file
                     with open(trap_file, 'a') as f:
-                        f.write(f"{np.round(traps[n], dec_places)}\n")
-                    # Reset trap timer
-                    T_timer[n] = 0
+                        f.write(f"{np.round(T_timer[n], dec_places)}\n")
 
-                # Check for bulk completion
-                elif not np.isnan(bulks[n]):
-                    # Save time to file
+                    # Calculate bulk time
+                    bulk = (B_timer[n] - T_timer[n]) * self.dt
+                    # Save bulk time to file
                     with open(bulk_file, 'a') as f:
-                        f.write(f"{np.round(bulks[n], dec_places)}\n")
-                    # Reset bulk timer
+                        f.write(f"{np.round(bulk, dec_places)}\n")
+
+                    # Reset trap and bulk timers
+                    T_timer[n] = 0
                     B_timer[n] = 0
 
                 # Keep trap timer at zero if particle in bulk
