@@ -336,12 +336,12 @@ class ABPTrap:
                     B_timer[n] = 0
 
                 # Keep trap timer at zero if particle in bulk
-                elif is_bulk:
+                elif is_bulk[n]:
                     T_timer[n] = 0
 
-                # Increment trap/bulk timers
-                    T_timer += t_timer
-                    B_timer += 1
+            # Increment trap/bulk timers
+            T_timer += t_timer
+            B_timer += 1
 
 
 
