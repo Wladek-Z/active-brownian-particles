@@ -284,7 +284,7 @@ def track_traps(y, dt, theta=None):
     return idx_start, idx_end, trap_times
 
 @njit
-def track_traps_and_bulk(y, dt):
+def track_traps_and_bulk_OLD(y, dt):
     """
     Calculate trapping and bulk times within a single ABP trajectory.
     
@@ -333,6 +333,47 @@ def track_traps_and_bulk(y, dt):
             timer_b += 1
     # Return trapping times, bulk times
     return trap_times, bulk_times, trap_start, trap_end, bulk_start, bulk_end
+
+@njit
+def track_traps_and_bulk(y):
+    """
+    Calculate trapping and bulk times within a single ABP trajectory.
+    
+    Arguments:
+        y: single particle transverse trajectory
+    
+    Returns:
+        trap_start: starting indices of each trap
+        trap_end: termination indices of each trap
+        bulk_start: starting indices of each bulk section
+        bulk_end: termination indices of each bulk section
+    """
+    bottom = 0.05
+    top = 0.95
+    t_timer = 0
+    b_timer = 0
+    min_time = 100
+    trap_start = np.full(len(y), False)
+    trap_end = np.full(len(y), False)
+    bulk_start = np.full(len(y), False)
+    bulk_end = np.full(len(y), False)
+    # Check trajectory for traps
+    for i in range(1, len(y)):
+        if (y[i-1] == y[i] and t_timer == 0) or (t_timer > 0 and (bottom > y[i] or y[i] > top)):
+            t_timer += 1
+            b_timer += 1
+        elif t_timer > min_time and (bottom <= y[i] <= top):
+            trap_end[i] = True
+            trap_start[i - t_timer] = True
+            bulk_start[i - b_timer] = True
+            bulk_end[i - t_timer] = True
+            t_timer = 0
+            b_timer = 0
+        else:
+            t_timer = 0
+            b_timer += 1
+    # Return trap coordinates, bulk coordinates
+    return trap_start, trap_end, bulk_start, bulk_end
 
 class ABP:
     """
@@ -587,7 +628,6 @@ class ABP:
         end_x, end_y = data[-1, 0, 0], data[-1, 0, 1]
         # Calculate orientation angles
         dx, dy = data1[:, 0, 0], data1[:, 0, 1]
-        theta = np.arctan2(dy, dx)
 
         # Plot regular trajectory with optional traps
         fig = plt.figure(figsize=[8, 6])
@@ -598,7 +638,7 @@ class ABP:
         plt.scatter(end_x, end_y, color='red', s=20, zorder=1)
 
         if show_traps:
-            _, _, trap_start, trap_end, bulk_start, bulk_end = track_traps_and_bulk(y, self.dt)
+            trap_start, trap_end, bulk_start, bulk_end = track_traps_and_bulk(y)
             # Show traps
             plt.scatter(x[trap_start], y[trap_start], color='cyan', s=15, zorder=1)
             plt.scatter(x[trap_end], y[trap_end], color='orange', s=15, zorder=1)
@@ -845,28 +885,6 @@ class ABP:
 
         plt.show()
 
-    def TTD(self, pos, orient):
-        """
-        Record the trapping time distribution.
-        
-        Arguments:
-            pos: position history
-            orient: orientation history
-        """
-        # Separate transverse coordinate from positions
-        y = pos[:, :, 1]
-        # Get array of trapping times
-        tt = trapping_times(y, orient, self.N, self.dt)
-        # Save results to data file
-        if vorticity == 1:
-            filename = f'ttd data/ttd_N{self.N}_{self.Ps}_{np.round(self.Pf/self.Ps, 6)}_{self.G}.txt'
-        else:
-            filename = f'ttd data/ttd_N{self.N}_{self.Ps}_{np.round(self.Pf/self.Ps, 6)}_{self.G}_NV.txt'
-        with open(filename, 'w') as f:
-            f.write(f"# lp/w = {self.Ps}\n")
-            f.write(f"# Pf/Ps = {np.round(self.Pf/self.Ps, 6)}\n")
-            f.write(f"# G = {self.G}\n")
-            np.savetxt(f, tt)
 
 
 

@@ -121,9 +121,8 @@ def update(N, r, theta, dt, Ps, D, Pf, G, T_timer):
         Returns:
             r_new: updated positions
             theta_new: updated orientations
-            t_timer: increments for trapping timer
             trap_complete: True if particle escapes trap
-            is_bulk: True for particles in the bulk
+            is_trap: True for particles apparently in a trap
         """
         # Initialise updated position/orientation variables
         r_new = np.zeros_like(r)
@@ -134,10 +133,8 @@ def update(N, r, theta, dt, Ps, D, Pf, G, T_timer):
         min_time = 100
         # Check status if particle escapes trap
         trap_complete = np.full(N, False)
-        # Check status if particle is in bulk
-        is_bulk = np.full(N, False)
-        # Initialise incremental trap timer
-        t_timer = np.zeros(N)
+        # Check status if particle appears trapped
+        is_trap = np.full(N, False)
 
         # Iterate over every particle
         for i in range(N):
@@ -163,17 +160,14 @@ def update(N, r, theta, dt, Ps, D, Pf, G, T_timer):
             y = r_new[i, 1]
             y_old = r[i, 1]
 
-            # Check for traps/bulk
-            if (y_old == y and T_timer[i] == 0) or (T_timer[i] > 0 and (bottom >= y or y >= top)):
-                t_timer[i] += 1
+            # Check for traps
+            if (y_old == y and T_timer[i] == 0) or (T_timer[i] > 0 and (bottom > y or y > top)):
+                is_trap[i] = True
             elif T_timer[i] > min_time and (bottom <= y <= top):
                 trap_complete[i] = True
-            else:
-                is_bulk[i] = True
-            
             
         # Return updated position and orientations
-        return r_new, theta_new, t_timer, trap_complete, is_bulk
+        return r_new, theta_new, trap_complete, is_trap
 
 @njit
 def orientation(theta, dt, Pf, y, G):
@@ -302,15 +296,15 @@ class ABPTrap:
         # Perform T iterations of the update procedure
         for i in range(1, self.T+1):
             # Update position and orientation
-            r, theta, t_timer, trap_complete, is_bulk = update(self.N, 
-                                                              r, 
-                                                              theta, 
-                                                              self.dt, 
-                                                              self.Ps, 
-                                                              self.D, 
-                                                              self.Pf, 
-                                                              self.G, 
-                                                              T_timer)
+            r, theta, trap_complete, is_trap = update(self.N, 
+                                                      r, 
+                                                      theta, 
+                                                      self.dt, 
+                                                      self.Ps, 
+                                                      self.D, 
+                                                      self.Pf, 
+                                                      self.G, 
+                                                      T_timer)
 
             # Iterate over each particle and write trapping/bulk times to file, reset timers
             for n in range(self.N):
@@ -330,13 +324,15 @@ class ABPTrap:
                     T_timer[n] = 0
                     B_timer[n] = 0
 
-                # Keep trap timer at zero if particle in bulk
-                elif is_bulk[n]:
-                    T_timer[n] = 0
+                # Increment timers if particle appears to be in a trap
+                elif is_trap[n]:
+                    T_timer[n] += 1
+                    B_timer[n] += 1
 
-            # Increment trap/bulk timers
-            T_timer += t_timer
-            B_timer += 1
+                # Keep trap timer at zero if particle not in trap
+                else:
+                    T_timer[n] = 0
+                    B_timer[n] += 1
 
 
 

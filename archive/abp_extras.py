@@ -541,6 +541,29 @@ class ABP:
 
         plt.show()
 
+    def TTD(self, pos, orient):
+        """
+        Record the trapping time distribution.
+        
+        Arguments:
+            pos: position history
+            orient: orientation history
+        """
+        # Separate transverse coordinate from positions
+        y = pos[:, :, 1]
+        # Get array of trapping times
+        tt = trapping_times(y, orient, self.N, self.dt)
+        # Save results to data file
+        if vorticity == 1:
+            filename = f'ttd data/ttd_N{self.N}_{self.Ps}_{np.round(self.Pf/self.Ps, 6)}_{self.G}.txt'
+        else:
+            filename = f'ttd data/ttd_N{self.N}_{self.Ps}_{np.round(self.Pf/self.Ps, 6)}_{self.G}_NV.txt'
+        with open(filename, 'w') as f:
+            f.write(f"# lp/w = {self.Ps}\n")
+            f.write(f"# Pf/Ps = {np.round(self.Pf/self.Ps, 6)}\n")
+            f.write(f"# G = {self.G}\n")
+            np.savetxt(f, tt)
+
     def Displacements(self, pos, orient):
         """
         Display the longitudinal displacements for the trajectory of a single ABP over time.
