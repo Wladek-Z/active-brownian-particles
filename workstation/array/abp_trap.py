@@ -310,9 +310,11 @@ class ABPTrap:
             for n in range(self.N):
                 # Check for trap completion
                 if trap_complete[n]:
+                    # Calculate trap time
+                    trap = T_timer[n] * self.dt
                     # Save trap time to file
                     with open(trap_file, 'a') as f:
-                        f.write(f"{np.round(T_timer[n], dec_places)}\n")
+                        f.write(f"{np.round(trap, dec_places)}\n")
 
                     # Calculate bulk time
                     bulk = (B_timer[n] - T_timer[n]) * self.dt
