@@ -125,6 +125,7 @@ def update(N, r, theta, dt, Ps, D, Pf, G, T_timer, B_timer):
             t_timer: increments for trapping timer
             trap_times: trapping times per particle
             bulk_times: times in the bulk per particle
+            is_bulk: True for particles in the bulk
         """
         # Initialise updated position/orientation variables
         r_new = np.zeros_like(r)
@@ -136,6 +137,8 @@ def update(N, r, theta, dt, Ps, D, Pf, G, T_timer, B_timer):
         # Initialise trapping/bulk time arrays in case of successful trap/bulk path completion
         trap_times = np.full(N, np.nan)
         bulk_times = np.full(N, np.nan)
+        # Return truth element if particle is not in trap
+        is_bulk = np.full(N, False)
         # Initialise incremental trap timers
         t_timer = np.zeros(N)
 
@@ -169,10 +172,12 @@ def update(N, r, theta, dt, Ps, D, Pf, G, T_timer, B_timer):
             elif T_timer[i] > min_time and (bottom <= y <= top):
                 trap_times[i] = T_timer[i] * dt
                 bulk_times[i] = (B_timer[i] - T_timer[i]) * dt
+            else:
+                is_bulk[i] = True
             
             
         # Return updated position and orientations
-        return r_new, theta_new, t_timer, trap_times, bulk_times
+        return r_new, theta_new, t_timer, trap_times, bulk_times, is_bulk
 
 @njit
 def orientation(theta, dt, Pf, y, G):
@@ -301,7 +306,7 @@ class ABPTrap:
         # Perform T iterations of the update procedure
         for i in range(1, self.T+1):
             # Update position and orientation
-            r, theta, t_timer, traps, bulks = update(self.N, 
+            r, theta, t_timer, traps, bulks, is_bulk = update(self.N, 
                                                               r, 
                                                               theta, 
                                                               self.dt, 
@@ -329,6 +334,10 @@ class ABPTrap:
                         f.write(f"{np.round(bulks[n], dec_places)}\n")
                     # Reset bulk timer
                     B_timer[n] = 0
+
+                # Keep trap timer at zero if particle in bulk
+                elif is_bulk:
+                    T_timer[n] = 0
 
                 # Increment trap/bulk timers
                     T_timer += t_timer
