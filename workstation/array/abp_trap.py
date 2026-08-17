@@ -24,7 +24,7 @@ vorticity = 1
 noise_r = 1
 
 @njit
-def update(N, r, theta, dt, Ps, D, Pf, G, T_timer, B_timer):
+def update_OLD(N, r, theta, dt, Ps, D, Pf, G, T_timer, B_timer):
         """
         Update the positions and orientations of each particle.
         
@@ -85,7 +85,7 @@ def update(N, r, theta, dt, Ps, D, Pf, G, T_timer, B_timer):
             # Extract transverse coordinates
             y = r_new[i, 1]
             y_old = r[i, 1]
-            
+
             # Check for traps/bulk
             if y_old == y and T_timer[i] == 0:
                 bulk_times[i] = B_timer[i] * dt
@@ -98,8 +98,81 @@ def update(N, r, theta, dt, Ps, D, Pf, G, T_timer, B_timer):
             else:
                 b_timer[i] += 1
             
+            
         # Return updated position and orientations
         return r_new, theta_new, t_timer, b_timer, trap_times, bulk_times
+
+@njit
+def update(N, r, theta, dt, Ps, D, Pf, G, T_timer, B_timer):
+        """
+        Update the positions and orientations of each particle, track traps.
+        
+        Arguments:
+            N: number of particles
+            r: particle positions
+            theta: particle orientations (angular form)
+            dt: timestep 
+            Ps: swim Peclet number
+            D: effective diffusivity
+            Pf: flow Peclet number
+            G: elongation factor
+            T_timer: timer for tracking traps per particle
+            B_timer: timer for tracking bulk swimming per particle
+
+        Returns:
+            r_new: updated positions
+            theta_new: updated orientations
+            t_timer: increments for trapping timer
+            trap_times: trapping times per particle
+            bulk_times: times in the bulk per particle
+        """
+        # Initialise updated position/orientation variables
+        r_new = np.zeros_like(r)
+        theta_new = np.zeros_like(theta)
+        # Initialise trapping criteria parameters
+        bottom = 0.05
+        top = 0.95
+        min_time = 100
+        # Initialise trapping/bulk time arrays in case of successful trap/bulk path completion
+        trap_times = np.full(N, np.nan)
+        bulk_times = np.full(N, np.nan)
+        # Initialise incremental trap timers
+        t_timer = np.zeros(N)
+
+        # Iterate over every particle
+        for i in range(N):
+            # Calcaulte orientation
+            e = np.array([np.cos(theta[i]), np.sin(theta[i])])
+            # Compute swim velocity term
+            r_swim = dt * Ps * e 
+            # Generate translational noise term
+            r_noise = np.sqrt(2 * D * dt) * np.random.normal(0, 1, 2) 
+            # Update position via forward difference scheme
+            r_new[i] = r[i] + r_swim + r_noise
+            # Incorporate correction due to fluid flow
+            r_new[i, 0] += 4 * dt * Pf * r[i, 1] * (1 - r[i, 1]) 
+
+            # Impose reflection at boundaries
+            if r_new[i, 1] < 0 or r_new[i, 1] > 1:
+                r_new[i, 1] = r[i, 1]
+
+            # Update orientation
+            theta_new[i] = orientation(theta[i], dt, Pf, r_new[i, 1], G)
+
+            # Extract transverse coordinates
+            y = r_new[i, 1]
+            y_old = r[i, 1]
+
+            # Check for traps/bulk
+            if (y_old == y and T_timer[i] == 0) or (T_timer[i] > 0 and (bottom >= y or y >= top)):
+                t_timer[i] += 1
+            elif T_timer[i] > min_time and (bottom <= y <= top):
+                trap_times[i] = T_timer[i] * dt
+                bulk_times[i] = (B_timer[i] - T_timer[i]) * dt
+            
+            
+        # Return updated position and orientations
+        return r_new, theta_new, t_timer, trap_times, bulk_times
 
 @njit
 def orientation(theta, dt, Pf, y, G):
@@ -228,7 +301,7 @@ class ABPTrap:
         # Perform T iterations of the update procedure
         for i in range(1, self.T+1):
             # Update position and orientation
-            r, theta, t_timer, b_timer, traps, bulks = update(self.N, 
+            r, theta, t_timer, traps, bulks = update(self.N, 
                                                               r, 
                                                               theta, 
                                                               self.dt, 
@@ -238,10 +311,6 @@ class ABPTrap:
                                                               self.G, 
                                                               T_timer, 
                                                               B_timer)
-
-            # Increment trap/bulk timers
-            T_timer += t_timer
-            B_timer += b_timer
 
             # Iterate over each particle and write trapping/bulk times to file, reset timers
             for n in range(self.N):
@@ -260,6 +329,10 @@ class ABPTrap:
                         f.write(f"{np.round(bulks[n], dec_places)}\n")
                     # Reset bulk timer
                     B_timer[n] = 0
+
+                # Increment trap/bulk timers
+                    T_timer += t_timer
+                    B_timer += 1
 
 
 

@@ -3,9 +3,5 @@ import numpy as np
 import os
 
 
-filename = '0.25 0.5.txt'
-
-Ps, string = filename.split(' ')
-Pf = string.split('.txt')[0]
-
-print(f"Ps = {Ps}, Pf = {Pf}")
+x = [2, 1, 3]
+print(np.argsort(x) * 0.5)

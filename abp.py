@@ -295,6 +295,10 @@ def track_traps_and_bulk(y, dt):
     Returns:
         trap_times: the trapping times in a single trajectory
         bulk_times: the time spent in the bulk sections in a single trajectory
+        trap_start: starting indices of each trap
+        trap_end: termination indices of each trap
+        bulk_start: starting indices of each bulk section
+        bulk_end: termination indices of each bulk section
     """
     bottom = 0.05
     top = 0.95
@@ -303,10 +307,16 @@ def track_traps_and_bulk(y, dt):
     trap_times = []
     bulk_times = []
     min_time = 100
+    trap_start = np.full(len(y), False)
+    trap_end = np.full(len(y), False)
+    bulk_start = np.full(len(y), False)
+    bulk_end = np.full(len(y), False)
     # Check trajectory for traps
     for i in range(1, len(y)):
         if y[i-1] == y[i] and timer_t == 0:
             bulk_times.append(timer_b * dt)
+            bulk_end[i] = True
+            bulk_start[i - timer_b] = True
             timer_b = 0
             timer_t += 1
         if timer_t > 0 and (bottom >= y[i] or y[i] >= top):
@@ -314,13 +324,15 @@ def track_traps_and_bulk(y, dt):
             timer_b = 0
         elif timer_t > min_time and (bottom <= y[i] <= top):
             trap_times.append(timer_t * dt)
+            trap_end[i] = True
+            trap_start[i - timer_t] = True
             timer_t = 0
             timer_b += 1
         else:
             timer_t = 0
             timer_b += 1
     # Return trapping times, bulk times
-    return trap_times, bulk_times
+    return trap_times, bulk_times, trap_start, trap_end, bulk_start, bulk_end
 
 class ABP:
     """
@@ -586,18 +598,41 @@ class ABP:
         plt.scatter(end_x, end_y, color='red', s=20, zorder=1)
 
         if show_traps:
-            idx_s, idx_e, _ = track_traps(y, self.dt, theta)
+            _, _, trap_start, trap_end, bulk_start, bulk_end = track_traps_and_bulk(y, self.dt)
             # Show traps
-            plt.scatter(x[idx_s], y[idx_s], color='cyan', s=15, zorder=1)
-            plt.scatter(x[idx_e], y[idx_e], color='orange', s=15, zorder=1)
+            plt.scatter(x[trap_start], y[trap_start], color='cyan', s=15, zorder=1)
+            plt.scatter(x[trap_end], y[trap_end], color='orange', s=15, zorder=1)
+            plt.title(f"Trajectory (traps): $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
+        else:
+            plt.title(f"Trajectory: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
 
-        #plt.scatter(x, y, color='black', marker='.', s=1, zorder=-1)
-        plt.plot(x, y, color='black', zorder=-1)
+        plt.scatter(x, y, color='black', marker='.', s=1, zorder=-1)
+        plt.plot(x, y, color='black', zorder=-1, alpha=0.5)
         plt.xlabel(r"$x/w$")
         plt.ylabel(r"$y/w$")
         plt.axhline(0, color='black', linestyle='--', alpha=0.5)
         plt.axhline(1, color='black', linestyle='--', alpha=0.5)
         plt.tight_layout()
+
+        if show_traps:
+            fig = plt.figure(figsize=[8, 6])
+            plt.title(f"Trajectory (bulk): $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
+    
+            # Show start and end points of trajectory
+            plt.scatter(start_x, start_y, color='lime', s=20, zorder=1)
+            plt.scatter(end_x, end_y, color='red', s=20, zorder=1)
+    
+            # Show bulk sections
+            plt.scatter(x[bulk_start], y[bulk_start], color='cyan', s=15, zorder=1)
+            plt.scatter(x[bulk_end], y[bulk_end], color='orange', s=15, zorder=1)
+    
+            plt.scatter(x, y, color='black', marker='.', s=1, zorder=-1)
+            plt.plot(x, y, color='black', zorder=-1, alpha=0.5)
+            plt.xlabel(r"$x/w$")
+            plt.ylabel(r"$y/w$")
+            plt.axhline(0, color='black', linestyle='--', alpha=0.5)
+            plt.axhline(1, color='black', linestyle='--', alpha=0.5)
+            plt.tight_layout()
 
         # Show trajectory with orientation directions overlaid
         if show_arrows:

@@ -251,6 +251,82 @@ def collect_trajectories(folder, sample, output):
     # Save to npz file
     np.savez(output, x=data)
 
+def get_decay(t, counts, fit_start):
+    """
+    Fit trapping/bulk time distributions to an exponential decay.
+    
+    Argument:
+        t: trapping/bulk times
+        counts: probability density
+        fit_start: where to start fitting data
+    
+    Returns:
+        tau: characteristic decay time
+        C: prefactor
+    """
+    # Filter zeros out of data
+    xdata = t[counts > 0]
+    ydata = counts[counts > 0]
+    # Neglect very small times
+    late = xdata >= fit_start
+    # Take the logarithms of counts and mask data
+    y = np.log(ydata[late])
+    x = xdata[late]
+    # Fit to a 1st degree polynomial
+    a, b = np.polyfit(x, y, 1)
+    # Convert parameters to relevant constants
+    tau = -1 / a
+    C = np.exp(b)
+    # return fitted parameters
+    return tau, C
+
+def collect_tau(input, output, Ps_params, Pf_params):
+    """
+    Calculate the decay constant tau of the trapping time and bulk time distribution
+    datasets by fitting to an exponential decay above some minimum time.
+    
+    Arguments:
+        input: directory containing the MSD files for each point in Peclet number-space
+        output: file to save the resulting scaling exponent
+        Ps_params: file containing swim Peclet numbers
+        Pf_params: file containing flow Peclet numbers
+    """
+    # Select number of bins for histogram
+    num_bins = 'auto'
+    # Define where to start fitting
+    fit_start = 0.1
+    # Read in Peclet number lists
+    Ps_list = np.loadtxt(Ps_params, dtype=str)
+    Pf_list = np.loadtxt(Pf_params, dtype=str)
+
+    # Write header to file
+    with open(output, 'w') as f:
+        f.write("# Ps Pf tauTTD tauBTD\n")
+
+    # Iterate over each point in phase space
+    for Ps, Pf in zip(Ps_list, Pf_list):
+        # Read in ttd and btd data
+        input_ttd = f"{input}/ttd data/{Ps} {Pf}.txt"
+        ttd = np.loadtxt(input_ttd, unpack=True)
+        input_btd = f"{input}/btd data/{Ps} {Pf}.txt"
+        btd = np.loadtxt(input_btd, unpack=True)
+
+        # Filter btd data
+        btd = btd[btd > 0.1]
+        # Construct trapping time histogram
+        counts_ttd, bins_ttd = np.histogram(ttd, bins=num_bins, density=True)
+        bin_centres_ttd = (bins_ttd[:-1] + bins_ttd[1:]) / 2
+        # Construct bulk time histogram
+        counts_btd, bins_btd = np.histogram(btd, bins=num_bins, density=True)
+        bin_centres_btd = (bins_btd[:-1] + bins_btd[1:]) / 2
+        
+        # Fit distributions to exponential decay and get tau
+        tau_ttd, _ = get_decay(bin_centres_ttd, counts_ttd, fit_start)
+        tau_btd, _ = get_decay(bin_centres_btd, counts_btd, fit_start)
+
+        # Write to file
+        with open(output, 'a') as f:
+            f.write(f"{Ps} {Pf} {tau_ttd} {tau_btd}\n")
 
 if __name__ == "__main__":
     # Parse command line arguments
@@ -258,6 +334,7 @@ if __name__ == "__main__":
     parser.add_argument('-i', type=str, default=None, help='Directory containing input data')
     parser.add_argument('--VX', action='store_true', help='Collect mean velocity data for a phase point')
     parser.add_argument('--VXf', action='store_true', help='Collect mean velocity data into a single file')
+    parser.add_argument('--tau', action='store_true', help='Collect decay constants for trapping/bulk times over all phase space')
     parser.add_argument('-Ps', type=float, help='swim Peclet number')
     parser.add_argument('-Pf', type=float, help='flow Peclet number parameter')
     parser.add_argument('-PsL', type=str, help='Filepath to swim Peclet number parameter file')
@@ -285,3 +362,5 @@ if __name__ == "__main__":
         collect_trajectories(args.i, args.s, args.o)
     elif args.velocities:
         collect_velocities(args.i, args.o, args.Ps, args.dt)
+    elif args.tau:
+        collect_tau(args.i, args.o, args.PsL, args.PfL)

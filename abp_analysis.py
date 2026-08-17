@@ -223,6 +223,8 @@ def phase_diagram_alpha(filename):
     plt.tight_layout()
     plt.show()
 
+
+
 def phase_diagram_beta_Deff(filename):
     """
     Construct a phase diagram of the variance scaling exponent and the effective diffusivity.
@@ -271,6 +273,55 @@ def phase_diagram_beta_Deff(filename):
     for Ps, Pf, deff in zip(x, y, Deff):
         if Pf == (2 * Ps - 1):
             plt.text(Ps, Pf, f"{np.round(deff, 3)}", ha='center', va='center', fontsize=8)
+
+    plt.show()
+
+def phase_diagram_tau(filename):
+    """
+    Construct a phase diagram of tau for the trapping and bulk time distributions.
+    
+    Arguments:
+        filename: filepath to decay constant results
+    """
+    # Read in and interpret data
+    x, y, tau_ttd, tau_btd = np.loadtxt(filename, unpack=True)
+    nx, ny = np.unique(x), np.unique(y)
+    size_x = len(nx)
+    size_y = len(ny)
+    tauTTD = tau_ttd.reshape(size_x, size_y).T
+    tauBTD = tau_btd.reshape(size_x, size_y).T
+    X, Y = np.meshgrid(nx, ny)
+
+    # Define phase diagram plotting function
+    def plot(data, cmap, norm, title, label):
+        fig = plt.figure(figsize=[8, 6])
+        plt.title(f"{title}")
+        plt.pcolormesh(X, Y, data, cmap=cmap, norm=norm, shading='auto')
+        cbar = plt.colorbar(label=label)
+        plt.xlabel("$Pe_s$")
+        plt.ylabel("$Pe_f$")
+        plt.tight_layout()
+        return fig
+    
+    # Generate labelling for trapping tau
+    title_ttd = "Characteristic trapping time"
+    label_ttd = r'$\tau_t$'
+    # Plot characteristic trapping time
+    plot(tauTTD, 'rainbow', 'log', title_ttd, label_ttd)
+
+    # Generate labelling for bulk tau
+    title_btd = r"Characteristic bulk time"
+    label_btd = r'$\tau_b$'
+    # Plot characteristic bulk time
+    plot(tauBTD, 'rainbow', 'log', title_btd, label_btd)
+
+    # Generate labelling for ratio of taus
+    title_ratio = "Characteristic trapping:bulk time ratio"
+    label_ratio = r"$\tau_t/\tau_b$"
+    # Normalise divergent colormap
+    #norm_ratio = colors.TwoSlopeNorm(vmin=(tauTTD/tauBTD).min(), vcenter=0.5, vmax=(tauTTD/tauBTD).max())
+    # Plot ratio of characteristic trapping to bulk times
+    plot(tauTTD/tauBTD, 'rainbow', 'log', title_ratio, label_ratio)
 
     plt.show()
 
@@ -789,6 +840,7 @@ if __name__ == "__main__":
     parser.add_argument('--PDX', action='store_true', help='Compare the phase diagrams of alpha for total and longitudinal displacement')
     parser.add_argument('--PDVX', action='store_true', help='Construct a phase diagram for the mean longitudinal velocity only')
     parser.add_argument('--PDA', action='store_true', help='Construct a phase diagram for the MSD scaling exponent only')
+    parser.add_argument('--PDt', action='store_true', help='Construct a phase diagram for trapping/bulk time decay constant only')
     parser.add_argument('--PDB', action='store_true', help='Construct a phase diagram for the bariance scaling exponent and effective diffusivity only')
     parser.add_argument('-F', type=str, default=None, help='Folder containing data files')
     parser.add_argument('--trajectory', action='store_true', help="Plot trajectory from logscale data file")
@@ -809,6 +861,8 @@ if __name__ == "__main__":
         phase_diagram_alpha(args.f1)
     elif args.PDB:
         phase_diagram_beta_Deff(args.f1)
+    elif args.PDt:
+        phase_diagram_tau(args.f1)
     if args.PD3:
         pd3_comparison(args.f1, args.f2, args.f3)
     if args.PDX:
