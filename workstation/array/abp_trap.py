@@ -290,6 +290,8 @@ class ABPTrap:
         # Initialise trapping/bulk time output files
         open(trap_file, 'w')
         open(bulk_file, 'w')
+        # Only track bulk times after completing first trap
+        valid_bulk = np.full(self.N, False)
         # Get number of decimal places for rounding output
         dec_places = len(str(self.dt).split('.')[1])
 
@@ -317,10 +319,14 @@ class ABPTrap:
                         f.write(f"{np.round(trap, dec_places)}\n")
 
                     # Calculate bulk time
-                    bulk = (B_timer[n] - T_timer[n]) * self.dt
-                    # Save bulk time to file
-                    with open(bulk_file, 'a') as f:
-                        f.write(f"{np.round(bulk, dec_places)}\n")
+                    if valid_bulk[n]:
+                        bulk = (B_timer[n] - T_timer[n]) * self.dt
+                        # Save bulk time to file
+                        with open(bulk_file, 'a') as f:
+                            f.write(f"{np.round(bulk, dec_places)}\n")
+                    # Validate bulk measurements
+                    else:
+                        valid_bulk[n] = True
 
                     # Reset trap and bulk timers
                     T_timer[n] = 0

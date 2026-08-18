@@ -178,10 +178,32 @@ def phase_diagram_vx(filename):
     plt.ylabel("$Pe_f$")
 
     # Plot values as text
-    for Ps, Pf, vx in zip(x, y, mean_vx):
-        #if Pf == (2 * Ps - 1):
-        plt.text(Ps, Pf, f"{np.round(vx, 3)}", ha='center', va='center', fontsize=8)
+    #for Ps, Pf, vx in zip(x, y, mean_vx):
+    #    #if Pf == (2 * Ps - 1):
+    #    plt.text(Ps, Pf, f"{np.round(vx, 3)}", ha='center', va='center', fontsize=8)
 
+    # Plot boundary between upstream/downstream swimming
+    inc = (y[1] - y[0]) * 0.5
+    Ps_list = np.sort(np.unique(x))
+    dPs = Ps_list[1] - Ps_list[0]
+    edges = np.concatenate(([Ps_list[0] - dPs/2], Ps_list + dPs/2))
+    Pf_stairs = np.full(len(Ps_list), inc)
+    i = -1
+
+    for Ps in Ps_list:
+        i += 1
+        mvx_list = mean_vx[x == Ps]
+        Pf_list = y[x == Ps]
+        nmvx_list = mvx_list[mvx_list <= 0]
+        if len(nmvx_list) > 0:
+            max_nmvx = np.max(nmvx_list)
+            Pf = Pf_list[mvx_list == max_nmvx][0]
+            Pf_stairs[i] = Pf + inc
+
+    plt.stairs(Pf_stairs, edges, color='black', label='min($|v_x < 0|$)')
+    plt.ylim(bottom=inc)
+
+    plt.legend()
     plt.tight_layout()
     plt.show()
 
@@ -222,8 +244,6 @@ def phase_diagram_alpha(filename):
 
     plt.tight_layout()
     plt.show()
-
-
 
 def phase_diagram_beta_Deff(filename):
     """
@@ -318,11 +338,32 @@ def phase_diagram_tau(filename):
     # Generate labelling for ratio of taus
     title_ratio = "Characteristic trapping:bulk time ratio"
     label_ratio = r"$\tau_t/\tau_b$"
-    # Normalise divergent colormap
-    #norm_ratio = colors.TwoSlopeNorm(vmin=(tauTTD/tauBTD).min(), vcenter=0.5, vmax=(tauTTD/tauBTD).max())
     # Plot ratio of characteristic trapping to bulk times
-    plot(tauTTD/tauBTD, 'rainbow', 'log', title_ratio, label_ratio)
+    fig = plt.figure(figsize=[8, 6])
+    plt.title(f"{title_ratio}")
+    plt.pcolormesh(X, Y, tauTTD/tauBTD, cmap='rainbow', norm='log', shading='auto')
+    cbar = plt.colorbar(label=label_ratio)
+    plt.xlabel("$Pe_s$")
+    plt.ylabel("$Pe_f$")
 
+    # Draw Ps = Pf line and mark unit ratio phase points
+    Ps_list = []
+    Pf_list = []
+    Ps_ratio_1 = []
+    Pf_ratio_1 = []
+    for i in range(len(x)):
+        if x[i] == y[i]:
+            Ps_list.append(x[i])
+            Pf_list.append(y[i])
+        if np.round(tau_ttd[i]/tau_btd[i], 0) == 1:
+            Ps_ratio_1.append(x[i])
+            Pf_ratio_1.append(y[i])
+
+    plt.plot(Ps_list, Pf_list, color='black', label='$Pe_s = Pe_f$')
+    plt.scatter(Ps_ratio_1, Pf_ratio_1, marker='+', color='black', s=20, label=r'$\tau_t/\tau_b \approx 1$')
+
+    plt.legend()
+    plt.tight_layout()
     plt.show()
 
 def pd3_comparison(filename1, filename2, filename3):
