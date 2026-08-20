@@ -200,7 +200,7 @@ def phase_diagram_vx(filename):
             Pf = Pf_list[mvx_list == max_nmvx][0]
             Pf_stairs[i] = Pf + inc
 
-    plt.stairs(Pf_stairs, edges, color='black', label='min($|v_x < 0|$)')
+    plt.stairs(Pf_stairs, edges, color='black', label=r'$\langle v_x \rangle \rightarrow 0$')
     plt.ylim(bottom=inc)
 
     plt.legend()
@@ -360,7 +360,7 @@ def phase_diagram_tau(filename):
             Pf_ratio_1.append(y[i])
 
     plt.plot(Ps_list, Pf_list, color='black', label='$Pe_s = Pe_f$')
-    plt.scatter(Ps_ratio_1, Pf_ratio_1, marker='+', color='black', s=20, label=r'$\tau_t/\tau_b \approx 1$')
+    plt.scatter(Ps_ratio_1, Pf_ratio_1, marker='+', color='black', s=20, label=r'$0.5 \leq \tau_t/\tau_b < 1.5$')
 
     plt.legend()
     plt.tight_layout()

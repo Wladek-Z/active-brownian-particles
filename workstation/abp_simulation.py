@@ -266,8 +266,6 @@ if __name__ == "__main__":
         phase_diagram(args.f, args.N, args.T, args.dt, args.D, args.l1, args.u1, args.l2, args.u2, args.n, args.G)
     elif args.PDX:
         phase_diagram_x(args.f, args.N, args.T, args.dt, args.D, args.l1, args.u1, args.l2, args.u2, args.n, args.G)
-    elif args.PD1:
-        phase_diagram_single(args.f, args.N, args.T, args.dt, args.D, args.G, args.Ps, args.Pf)
     elif args.hist:
         collect_histogram(args.F, args.N, args.T, args.dt, args.Ps, args.D, args.Pf, args.G, args.bins)
     elif args.eff:

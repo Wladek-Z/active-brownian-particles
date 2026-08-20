@@ -654,7 +654,7 @@ class ABP:
         plt.axhline(1, color='black', linestyle='--', alpha=0.5)
         plt.tight_layout()
 
-        if show_traps:
+        if 1 == 2:
             fig = plt.figure(figsize=[8, 6])
             plt.title(f"Trajectory (bulk): $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
     

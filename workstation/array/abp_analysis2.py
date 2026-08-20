@@ -48,7 +48,7 @@ def plot_displacement(G, Ps, Pf, sample, timechain, start):
     fig = plt.figure(figsize=[10, 6])
     plt.title(f"Displacement over time: $G$ = {G}, $Pe_s$ = {Ps}, $Pe_f$ = {Pf}")
     plt.ylabel("$x/w$")
-    plt.xlabel(r"$t/\tau_r$")
+    plt.xlabel("$tD_r$")
     plt.axhline(0, linestyle='--', color='black')
 
     # Plot each displacement over time
@@ -291,7 +291,7 @@ def get_decay(t, counts, fit_start):
 
 
 if __name__ == "__main__":
-    # Parse command line arguments
+    # Parse command line arguments 
     parser = argparse.ArgumentParser()
     parser.add_argument('-G', type=str, help="Geometrical elongation factor")
     parser.add_argument('-Ps', type=str, help="Swim Peclet number")
