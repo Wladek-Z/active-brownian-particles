@@ -3,9 +3,16 @@ from matplotlib import pyplot as plt
 import scienceplots
 import argparse
 from matplotlib.legend_handler import HandlerTuple
+from pathlib import Path
+from scipy.stats import binned_statistic
 
 plt.style.use('science')
 plt.rcParams['text.usetex'] = False
+
+NBLOCKS = 125       # Number of logscale blocks
+NCONFIGS = 17       # Number of measurements per block
+N = 1000            # Number of particles
+BLOCKSIZE = 80000   # Number of timesteps per block
 
 dt = 0.001
 
@@ -58,6 +65,126 @@ def plot_displacement(G, Ps, Pf, sample, timechain, start):
     # Show figure
     plt.tight_layout()
     plt.show()
+
+def plot_PDFs(G, Ps, Pf):
+    """
+    Plot the spatial distribution histogram with overlaid mean velocity at that channel height, 
+    and with overlaid mean orientation at that channel height. Plot the longitudinal velocity histogram.
+    NOTE: Make sure to copy over the relevant directory containing the logscaled trajectories for the
+    relevant phase point from /data to /array.
+    
+    Arguments:
+        G: elongation factor
+        Ps: swim Peclet number
+        Pf: flow Peclet number
+    """
+    # Resolve folder path
+    folder = f"{Ps} {Pf}"
+    # Initialise variables
+    num_bins = 'auto'
+    n = -1
+    X = np.empty((N, NBLOCKS))
+    Y = np.empty((N, NBLOCKS))
+    THETA =np.empty((N, NBLOCKS))
+    VX = np.empty((N, NBLOCKS))
+
+    # Iterate over each particle trajectory in directory
+    for file in Path(folder).glob("*.txt"):
+        # Increment index
+        n += 1
+        # Read in data
+        x, y, theta = np.loadtxt(file, skiprows=1, delimiter=',', unpack=True)
+        # Input to arrays
+        X[n] = x[::NCONFIGS]
+        Y[n] = y[::NCONFIGS]
+        THETA[n] = theta[::NCONFIGS]
+        VX[n] = (x[1::NCONFIGS] - x[::NCONFIGS]) / dt
+
+    # Flatten data arrays
+    X = X.flatten()
+    THETA = THETA.flatten()
+    VX = VX.flatten()
+    Y = Y.flatten()
+
+    # Construct spatial PDF
+    pdfy, edgesy = np.histogram(y, bins=num_bins, density=True)
+
+    # Find average velocity at each section along channel width
+    mean_vx, _, _ = binned_statistic(Y, VX, statistic='mean', bins=edgesy)
+    bin_centres = 0.5 * (edgesy[:-1] + edgesy[1:])
+
+    # Plot figure
+    fig, ax1 = plt.subplots(figsize=[8, 6])
+    ax1.stairs(pdfy, edgesy, color='black')
+    ax1.set_title(f"Spatial PDF: $Pe_s$ = {Ps}, $Pe_f$ = {Pf}, $G$ = {G}")
+    ax1.set_xlabel("$y/w$")
+    ax1.set_ylabel("$P(y/w)$")
+    ax1.set_xlim(0, 1)
+
+    ax2 = ax1.twinx()  # instantiate a second Axes that shares the same x-axis
+
+    color = 'tab:green'
+    ax2.set_ylabel(r'$\langle v_x \rangle/v_0$', color=color)
+    ax2.plot(bin_centres, mean_vx/float(Ps), color=color)
+    ax2.tick_params(axis='y', labelcolor=color)
+    plt.tight_layout()
+
+    # Find average orientation at each section along channel width
+    mean_theta, _, _ = binned_statistic(Y, np.abs(THETA), statistic='mean', bins=edgesy)
+
+    # Plot spatial PDF with average orientation overlaid
+    fig, ax1 = plt.subplots(figsize=[8, 6])
+    ax1.stairs(pdfy, edgesy, color='black')
+    ax1.set_title(f"Spatial PDF: $Pe_s$ = {Ps}, $Pe_f$ = {Pf}, $G$ = {G}")
+    ax1.set_xlabel("$y/w$")
+    ax1.set_ylabel("$P(y/w)$")
+    ax1.set_xlim(0, 1)
+
+    ax2 = ax1.twinx()  # instantiate a second Axes that shares the same x-axis
+
+    color = 'tab:red'
+    ax2.set_ylabel(r'$\langle |\theta| \rangle$', color=color)  # we already handled the x-label with ax1
+    ax2.plot(bin_centres, mean_theta, color=color)
+    ax2.tick_params(axis='y', labelcolor=color)
+    ax2.set_yticks([0, np.pi/4, np.pi/2, 3*np.pi/4, np.pi], ['0', r'$\pi/4$', r'$\pi/2$', r'$3\pi/4$', r'$\pi$'])
+    plt.tight_layout()
+
+    # Find particle orientations near the surface
+    wall = ((Y < 0.05) | (Y > 0.95))
+    theta_wall = THETA[wall]
+    # Construct orientational PDF near the surface 
+    pdfwall, edgeswall = np.histogram(theta_wall, bins=num_bins, density=True)
+
+    # Find particle orientations in the bulk
+    theta_bulk = THETA[~wall]
+    # Construct orientational PDF in the bulk
+    pdfbulk, edgesbulk = np.histogram(theta_bulk, bins=num_bins, density=True)
+
+    # Plot both orientational distributions together
+    fig = plt.figure(figsize=[8, 6])
+    plt.stairs(pdfwall, edgeswall, color='red', label='wall')
+    plt.stairs(pdfbulk, edgesbulk, color='blue', label='bulk')
+    plt.title(f"Orientational PDF: $Pe_s$ = {Ps}, $Pe_f$ = {Pf}, $G$ = {G}")
+    plt.xlabel(r"$\theta$")
+    plt.ylabel(r"$P(\theta)$")
+    plt.xlim(-np.pi, np.pi)
+    plt.xticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi], [r'$-\pi$', r'$-\pi/2$', '0', r'$\pi/2$', r'$\pi$'])
+    plt.legend(loc='upper center')
+    plt.tight_layout()
+
+    # Construct instantaneous velocity PDF
+    pdfvx, edgesvx = np.histogram(VX/float(Ps), bins=num_bins, density=True)
+
+    fig = plt.figure(figsize=[8, 6])
+    plt.stairs(pdfvx, edgesvx, color='black')
+    plt.title(f"Velocity PDF: $Pe_s$ = {Ps}, $Pe_f$ = {Pf}, $G$ = {G}")
+    plt.xlabel("$v_x/v_0$")
+    plt.ylabel("$P(v_x/v_0)$")
+    plt.axvline(0, linestyle='dotted', color='black')
+    plt.tight_layout()
+
+    plt.show()
+
 
 def plot_velocities(G, Ps_params, Pf_params):
     """
@@ -309,6 +436,7 @@ if __name__ == "__main__":
     parser.add_argument('-f2', type=str, default=None, help='Filepath to second dataset, if applicable')
     parser.add_argument('-f3', type=str, default=None, help='Filepath to third dataset, if applicable')
     parser.add_argument('--TBTD', action='store_true', help="Plot the trapping and bulk time distributions and fit exponential decay")
+    parser.add_argument('--PDF', action='store_true', help="Plot the various probability density functions")
     args = parser.parse_args()
 
     if args.displacement:
@@ -319,3 +447,5 @@ if __name__ == "__main__":
         plot_TD3(args.G, args.f1, args.f2, args.f3, args.BTD3)
     elif args.TBTD:
         plot_TTD_BTD(args.G, args.Ps, args.Pf)
+    elif args.PDF:
+        plot_PDFs(args.G, args.Ps, args.Pf)
