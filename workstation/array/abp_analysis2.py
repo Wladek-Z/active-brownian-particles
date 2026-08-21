@@ -174,13 +174,17 @@ def plot_PDFs(G, Ps, Pf):
 
     # Construct instantaneous velocity PDF
     pdfvx, edgesvx = np.histogram(VX/float(Ps), bins=num_bins, density=True)
+    # Calculate mean velocity
+    vx_mean = np.mean(VX) / float(Ps)
 
     fig = plt.figure(figsize=[8, 6])
     plt.stairs(pdfvx, edgesvx, color='black')
     plt.title(f"Velocity PDF: $Pe_s$ = {Ps}, $Pe_f$ = {Pf}, $G$ = {G}")
     plt.xlabel("$v_x/v_0$")
     plt.ylabel("$P(v_x/v_0)$")
-    plt.axvline(0, linestyle='dotted', color='black')
+    plt.axvline(0, linestyle='dotted', color='black', label='$v_x = 0$')
+    plt.axvline(vx_mean, linestyle='dashed', color='black', label=r'$\langle v_x \rangle / v_0$ ' + f'= {np.round(vx_mean, 3)}')
+    plt.legend(loc='upper left')
     plt.tight_layout()
 
     plt.show()

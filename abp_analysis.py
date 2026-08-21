@@ -200,7 +200,7 @@ def phase_diagram_vx(filename):
             Pf = Pf_list[mvx_list == max_nmvx][0]
             Pf_stairs[i] = Pf + inc
 
-    plt.stairs(Pf_stairs, edges, color='black', label=r'$\langle v_x \rangle \rightarrow 0$')
+    #plt.stairs(Pf_stairs, edges, color='black', label=r'$\langle v_x \rangle \rightarrow 0$')
     plt.ylim(bottom=inc)
 
     plt.legend()
@@ -238,9 +238,9 @@ def phase_diagram_alpha(filename):
     plt.ylabel("$Pe_f$")
 
     # Plot values as text
-    for Ps, Pf, a in zip(x, y, alpha):
-        if Pf == (2 * Ps - 1):
-            plt.text(Ps, Pf, f"{np.round(a, 3)}", ha='center', va='center', fontsize=8)
+    #for Ps, Pf, a in zip(x, y, alpha):
+    #    if Pf == (2 * Ps - 1):
+    #        plt.text(Ps, Pf, f"{np.round(a, 3)}", ha='center', va='center', fontsize=8)
 
     plt.tight_layout()
     plt.show()

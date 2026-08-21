@@ -127,7 +127,7 @@ def get_lags(filename, offset):
     # Save to npz file
     np.savez(filename, lags)
 
-def get_MSD(folder, output, dt, dim, offset, lagsfile):
+def get_MSD(folder, output, dt, dim, offset, lagsfile, Ps, Pf):
     """
     Calculate the MSD in one dimension for a given combination of Peclet numbers by
     averaging over every available time interval, save output to file.
@@ -139,6 +139,8 @@ def get_MSD(folder, output, dt, dim, offset, lagsfile):
         dim: dimension along which to calculate MSD (0 = x, 1 = y)
         offset: how many blocks of data to skip at the start of each trajectory
         lagsfile: input file containing the unique measurement time intervals
+        Ps: swim Peclet number
+        Pf: flow Peclet number
     """
     # Read in and reshape position data
     x = get_data(folder, dim, offset)
@@ -182,8 +184,10 @@ def get_MSD(folder, output, dt, dim, offset, lagsfile):
     msd = msd_sum / count
     times = lags * dt
 
+    # Get path to output
+    filename = f"{output}/{Ps} {Pf}.txt"
     # Save to file
-    np.savetxt(output, np.column_stack((times, msd)), header='time MSD')
+    np.savetxt(filename, np.column_stack((times, msd)), header='time MSD')
 
 def get_old_MSD(folder, Ps, Pf, output, dt, dim, offset, timechain):
     """
@@ -368,7 +372,7 @@ if __name__ == "__main__":
     if args.lag:
         get_lags(args.o, args.off)
     elif args.MSD:
-        get_MSD(args.F, args.o, args.dt, args.d, args.off, args.f)
+        get_MSD(args.F, args.o, args.dt, args.d, args.off, args.f, args.Ps, args.Pf)
     elif args.ppMSD:
         get_particle_MSD(args.F, args.o, args.dt, args.d, args.off, args.f, args.s)
     elif args.old:

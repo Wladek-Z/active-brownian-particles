@@ -23,7 +23,7 @@ vorticity = 1
 noise_r = 1
 arrow_spacing = 100
 centre_start = False
-show_traps = True
+show_traps = False
 show_arrows = False
 
 @njit
@@ -631,7 +631,6 @@ class ABP:
 
         # Plot regular trajectory with optional traps
         fig = plt.figure(figsize=[8, 6])
-        plt.title(f"Trajectory: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
 
         # Show start and end points of trajectory
         plt.scatter(start_x, start_y, color='lime', s=20, zorder=1)
@@ -642,9 +641,9 @@ class ABP:
             # Show traps
             plt.scatter(x[trap_start], y[trap_start], color='cyan', s=15, zorder=1)
             plt.scatter(x[trap_end], y[trap_end], color='orange', s=15, zorder=1)
-            plt.title(f"Trajectory (traps): $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
+            plt.title(f"Trajectory (traps): $Pe_s$ = {self.Ps}, $Pe_f$ = {self.Ps}, $G$ = {self.G}")
         else:
-            plt.title(f"Trajectory: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
+            plt.title(f"Trajectory: $Pe_s$ = {self.Ps}, $Pe_f$ = {self.Ps}, $G$ = {self.G}")
 
         plt.scatter(x, y, color='black', marker='.', s=1, zorder=-1)
         plt.plot(x, y, color='black', zorder=-1, alpha=0.5)
@@ -656,7 +655,7 @@ class ABP:
 
         if 1 == 2:
             fig = plt.figure(figsize=[8, 6])
-            plt.title(f"Trajectory (bulk): $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
+            plt.title(f"Trajectory (bulk): $Pe_s$ = {self.Ps}, $Pe_f$ = {self.Ps}, $G$ = {self.G}")
     
             # Show start and end points of trajectory
             plt.scatter(start_x, start_y, color='lime', s=20, zorder=1)
@@ -677,7 +676,7 @@ class ABP:
         # Show trajectory with orientation directions overlaid
         if show_arrows:
             fig = plt.figure(figsize=[8, 6])
-            plt.title(f"Trajectory: $l_p/w$ = {self.Ps}, $Pe_f/Pe_s$ = {np.round(self.Pf/self.Ps, 6)}, $G$ = {self.G}")
+            plt.title(f"Trajectory: $Pe_s$ = {self.Ps}, $Pe_f$ = {self.Ps}, $G$ = {self.G}")
             
             # Show start and end points
             plt.scatter(start_x, start_y, color='lime', s=20, zorder=1)
