@@ -64,6 +64,54 @@ def plot_MSD(G, Ps, Pf, offset):
     plt.tight_layout()
     plt.show()
 
+def plot_variance(G, Ps, Pf, offset):
+    """
+    Plot the variance of displacement for a given set of parameters.
+
+    Arguments:
+        G: elongation factor
+        Ps: swim Peclet number
+        Pf: flow Peclet number
+        offset: number of skipped logscale blocks in data
+    """
+    # Resolve filepath
+    filename = f"G {G} results/variance o{offset}/{Ps} {Pf}.txt"
+    t, var = np.loadtxt(filename, unpack=True)
+
+    # Calculate theoretical (diffusive) variance (divide by 2 for theory in one dimension)
+    var_theory = (2 * d * (D + float(Ps)**2 / 2) * t) / 2
+
+    # Fit powerlaw to late-time data
+    a, b = get_powerlaw(t, var)
+    B = np.exp(b)
+    # Define x-axis data for fitted curve
+    t_fit = np.linspace(100, 10000, 50)
+    # Perform fit to late-time data
+    var_fit = B * t_fit**a
+    # Calculate diffusivity (x-direction)
+    D_eff = np.round(B / 2, 3)
+    # Calculate variance at t = 1000tau
+    var_fit_1000 = B * (1000)**a
+
+    # Plot results
+    fig = plt.figure(figsize=[8, 6])
+    plt.title(r"Var($\Delta x$): " + f"$Pe_s$ = {Ps}, $Pe_f$ = {Pf}, $G$ = {G}")
+    plt.scatter(t, var, color='black', marker='.', s=10, label='simulation')
+    plt.loglog(t, var_theory, color='red', linestyle='--', label=r'$\sim t$')
+    plt.axvline(1, color='black', linestyle='dotted', label=r'$t=\tau_r$')
+    plt.xlabel("$tD_r$")
+    plt.ylabel(r"$\langle (\Delta x - \langle \Delta x \rangle)^2 \rangle/w^2$")
+    plt.xscale('log')
+    plt.yscale('log')
+
+    # Add fitted parameters
+    plt.loglog(t_fit, var_fit, color='magenta', label=r'$\sim t^{\beta}$')
+    plt.text(1000, 0.75*var_fit_1000, r'$\beta$ = ' + f'{np.round(a, 3)}\n' + r'$D_{\mathrm{eff}}$ = ' + f'{D_eff}', ha='left', va='top', fontsize=12)
+    
+    plt.legend(loc='upper left')
+    plt.tight_layout()
+    plt.show()
+
 def plot_MSD3(G, filename1, filename2, filename3, offset):
     """
     Plot three MSDs along a line of constant swim Peclet number in phase-space.
@@ -293,6 +341,7 @@ if __name__ == "__main__":
     parser.add_argument('-Pf', type=str, help="flow Peclet number")
     parser.add_argument('-off', type=int, default=0, help="Skipped logscale blocks")
     parser.add_argument('--MSD', action='store_true', help="Plot the MSD")
+    parser.add_argument('--Var', action='store_true', help="Plot the variance")
     parser.add_argument('--MSD3', action='store_true', help="Plot three MSDs")
     parser.add_argument('--ppMSD', action='store_true', help="Plot MSDs for individual trajectories")
     parser.add_argument('--all', action='store_true', help="Plot all MSDs from parameter list")
@@ -313,3 +362,5 @@ if __name__ == "__main__":
         plot_pp_MSD(args.G, args.Ps, args.Pf, args.s)
     elif args.MSD3:
         plot_MSD3(args.G, args.f1, args.f2, args.f3, args.off)
+    elif args.Var:
+        plot_variance(args.G, args.Ps, args.Pf, args.off)
