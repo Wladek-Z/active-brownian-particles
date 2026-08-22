@@ -2,7 +2,7 @@
 
 #SBATCH --partition medium
 #SBATCH --mem-per-cpu 2G
-#SBATCH --time 6:00:00
+#SBATCH --time 12:00:00
 #SBATCH --job-name ABP
 #SBATCH --array=1-256
 #
