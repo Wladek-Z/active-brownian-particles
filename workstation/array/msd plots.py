@@ -295,7 +295,7 @@ def plot_pp_MSD(G, Ps, Pf, sample):
         sample: number of trajectories to plot
     """
     # Resolve folder filepath
-    filename = f"G {G} results/MSD ind/{Ps} {Pf} n{sample}.npz"
+    filename = f"G {G} NV results/MSD ind/{Ps} {Pf} n{sample}.npz"
     # Retrieve MSD data
     data = np.load(filename)
     t = data['time']
