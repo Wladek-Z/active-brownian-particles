@@ -54,8 +54,6 @@ def collect_mean_vx(input, output, Ps, dt):
 
     # Iterate over each particle trajectory in directory
     for file in Path(input).glob("*.txt"):
-        # Increment number of particles
-        particles += 1
         # Read in x-position data
         x = np.loadtxt(file, skiprows=1, delimiter=',', usecols=0)
         # Calculate instantaneous velocities
