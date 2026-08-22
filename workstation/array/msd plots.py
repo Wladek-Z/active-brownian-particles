@@ -21,7 +21,7 @@ def plot_MSD(G, Ps, Pf, offset):
         offset: number of skipped logscale blocks in data
     """
     # Resolve filepath
-    filename = f"G {G} results/MSD o{offset}/{Ps} {Pf}.txt"
+    filename = f"G {G} NV results/MSD o{offset}/{Ps} {Pf}.txt"
     t, msd = np.loadtxt(filename, unpack=True)
 
     # Obtain theory curves
