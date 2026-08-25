@@ -273,13 +273,15 @@ class ABPTrap:
         self.r, self.e = read_configurations(configs, N)
         
  
-    def Run(self, trap_file, bulk_file):
+    def Run(self, ttd_file, btd_file, tdx_file, bdx_file):
         """
         Run the simulation and return the results
 
         Arguments:
-            trap_file: file in which to save ttd data
-            bulk_file: file in which to save the btd data
+            ttd_file: file in which to save ttd data
+            btd_file: file in which to save the btd data
+            tdx_file: file in which to save the mean trap displacement
+            bdx_file: file in which to save the mean bulk displacement
         """
         # Get positions and orientations
         r = self.r
@@ -287,9 +289,18 @@ class ABPTrap:
         # Initialise trap and bulk timers
         T_timer = np.zeros(self.N)
         B_timer = np.zeros(self.N)
+        # Initialise trap and bulk start positions
+        T_starts = np.zeros(self.N)
+        B_starts = np.zeros(self.N)
+        # Initialise trap and bulk instance counters
+        T_count = 0
+        B_count = 0
+        # Initialise sum of trap and bulk displacements
+        tdx_sum = 0
+        bdx_sum = 0
         # Initialise trapping/bulk time output files
-        open(trap_file, 'w')
-        open(bulk_file, 'w')
+        open(ttd_file, 'w')
+        open(btd_file, 'w')
         # Only track bulk times after completing first trap
         valid_bulk = np.full(self.N, False)
         # Get number of decimal places for rounding output
@@ -312,18 +323,28 @@ class ABPTrap:
             for n in range(self.N):
                 # Check for trap completion
                 if trap_complete[n]:
+                    # Increment trap counter
+                    T_count += 1
                     # Calculate trap time
                     trap = T_timer[n] * self.dt
+                    # Add trap displacement to sum
+                    tdx_sum += r[n, 0] - T_starts[n]
                     # Save trap time to file
-                    with open(trap_file, 'a') as f:
+                    with open(ttd_file, 'a') as f:
                         f.write(f"{np.round(trap, dec_places)}\n")
 
-                    # Calculate bulk time
+                    # Check at least one trap has occurred
                     if valid_bulk[n]:
+                        # Increment bulk counter
+                        B_count += 1
+                        # Calculate bulk time
                         bulk = (B_timer[n] - T_timer[n]) * self.dt
+                        # Add bulk displacement to sum
+                        bdx_sum += T_starts[n] - B_starts[n]
                         # Save bulk time to file
-                        with open(bulk_file, 'a') as f:
+                        with open(btd_file, 'a') as f:
                             f.write(f"{np.round(bulk, dec_places)}\n")
+
                     # Validate bulk measurements
                     else:
                         valid_bulk[n] = True
@@ -334,14 +355,30 @@ class ABPTrap:
 
                 # Increment timers if particle appears to be in a trap
                 elif is_trap[n]:
+                    # Save starting position of trap
+                    if T_timer[n] == 0:
+                        T_starts[n] = r[n, 0]
+
                     T_timer[n] += 1
                     B_timer[n] += 1
 
                 # Keep trap timer at zero if particle not in trap
                 else:
+                    # Save starting position of bulk
+                    if B_timer[n] == 0:
+                        B_starts[n] = r[n, 0]
+
                     T_timer[n] = 0
                     B_timer[n] += 1
 
+        # Calculate mean trap and bulk displacements
+        mean_tdx = tdx_sum / T_count
+        mean_bdx = bdx_sum / B_count
+        # Save to file
+        with open(tdx_file, "w") as f:
+            f.write(f"{mean_tdx}")
+        with open(bdx_file, "w") as f:
+            f.write(f"{mean_bdx}")
 
 
 if __name__ == "__main__":
@@ -356,10 +393,12 @@ if __name__ == "__main__":
     parser.add_argument('-G', type=float, default=0, help='Geometrical factor related to particle aspect ratio')
     parser.add_argument('-ttd', type=str, default=None, help="Filepath to store the output ttd data")
     parser.add_argument('-btd', type=str, default=None, help="Filepath to store the output btd data")
+    parser.add_argument('-tdx', type=str, help="Filepath to store the mean trap displacement")
+    parser.add_argument('-bdx', type=str, help="Filepath to store the mean bulk displacement")
     parser.add_argument('-c', type=str, help="Directory containing logscale trajectories to read final ABP configurations")
     args = parser.parse_args()
 
     # Create ABP (trapping/bulk times) object
     abp = ABPTrap(args.N, args.T, args.dt, args.Ps, args.D, args.Pf, args.G, args.c)
     # Run simulation
-    abp.Run(args.ttd, args.btd)
+    abp.Run(args.ttd, args.btd, args.tdx, args.bdx)

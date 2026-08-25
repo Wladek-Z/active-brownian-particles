@@ -419,7 +419,7 @@ def pd3_comparison():
         axes[1].set_title('$G = 0$')
         axes[1].set_xlabel("$Pe_s$")
         mesh3 = axes[2].pcolormesh(X0NV, Y0NV, data3, cmap='bwr', norm=norm, shading='auto')
-        axes[2].set_title(r'$G = 0$, $\Omega = 0$')
+        axes[2].set_title(r'$\Omega = 0$')
         axes[2].set_xlabel("$Pe_s$")
         fig.suptitle(f"{title}")
         cbar = fig.colorbar(mesh3, ax=axes, location='right', label=label)
