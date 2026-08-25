@@ -259,11 +259,13 @@ def phase_diagram_dx(filename1, filename2):
     X, Y, BDX = read_data(filename2)
 
     # Define phase diagram plotting function
-    def plot(data, cmap, norm, title, label):
+    def plot(data, cmap, norm, title, label, ticks):
         fig = plt.figure(figsize=[8, 6])
         plt.title(f"{title}")
         plt.pcolormesh(X, Y, data, cmap=cmap, norm=norm, shading='auto')
         cbar = plt.colorbar(label=label)
+        cbar.set_ticks(ticks=ticks)
+        cbar.minorticks_off()
         plt.xlabel("$Pe_s$")
         plt.ylabel("$Pe_f$")
         plt.tight_layout()
@@ -272,16 +274,22 @@ def phase_diagram_dx(filename1, filename2):
     # Generate trap labelling
     title_T = "Mean longitudinal trap displacement"
     label_T = r'$\langle \Delta x \rangle_t$'
-    norm_T = None
+    norm_T = colors.TwoSlopeNorm(vmin=TDX.min(), vcenter=0, vmax=TDX.max())
+    part1 = np.linspace(TDX.min(), 0, 4)
+    part2 = np.linspace(0, TDX.max(), 4)[1:]
+    ticks_T = np.append(part1, part2)
     # Plot trap diagram
-    plot(TDX, 'rainbow', norm_T, title_T, label_T)
+    plot(TDX, 'bwr', norm_T, title_T, label_T, ticks_T)
 
     # Generate bulk labelling
     title_B = "Mean longitudinal bulk displacement"
     label_B = r'$\langle \Delta x \rangle_b$'
-    norm_B = None
+    norm_B = colors.TwoSlopeNorm(vmin=BDX.min(), vcenter=0, vmax=BDX.max())
+    part1 = np.linspace(BDX.min(), 0, 4)
+    part2 = np.linspace(0, BDX.max(), 4)[1:]
+    ticks_B = np.append(part1, part2)
     # Plot bulk diagram
-    plot(BDX, 'rainbow', norm_B, title_B, label_B)
+    plot(BDX, 'rainbow', norm_B, title_B, label_B, ticks_B)
 
     plt.show()
 
@@ -963,6 +971,8 @@ if __name__ == "__main__":
         phase_diagram_alt(args.f1)
     elif args.PDVX:
         phase_diagram_vx(args.f1)
+    elif args.PDDX:
+        phase_diagram_dx(args.f1, args.f2)
     elif args.PDA:
         phase_diagram_alpha(args.f1)
     elif args.PDB:

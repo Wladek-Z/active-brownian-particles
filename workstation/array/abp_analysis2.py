@@ -327,8 +327,8 @@ def plot_TTD_BTD(G, Ps, Pf):
     fit_start = 0.1
 
     # Read trapping/bulk times from datafile
-    ttd = np.loadtxt(f"G {G} results/ttd data/{Ps} {Pf}.txt", dtype=float)
-    btd = np.loadtxt(f"G {G} results/btd data/{Ps} {Pf}.txt", dtype=float)
+    ttd = np.loadtxt(f"G {G} results/ttd3 {Ps} {Pf}.txt", dtype=float)
+    btd = np.loadtxt(f"G {G} results/btd3 {Ps} {Pf}.txt", dtype=float)
 
     # Filter btd data
     btd = btd[btd > 0.1]
