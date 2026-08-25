@@ -52,8 +52,8 @@ def update_OLD(N, r, theta, dt, Ps, D, Pf, G, T_timer, B_timer):
         r_new = np.zeros_like(r)
         theta_new = np.zeros_like(theta)
         # Initialise trapping criteria parameters
-        bottom = 0.05
-        top = 0.95
+        bottom = 0.03
+        top = 0.97
         min_time = 100
         # Initialise trapping/bulk time arrays in case of successful trap/bulk path completion
         trap_times = np.full(N, np.nan)

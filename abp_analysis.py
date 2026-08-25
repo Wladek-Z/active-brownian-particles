@@ -245,6 +245,46 @@ def phase_diagram_alpha(filename):
     plt.tight_layout()
     plt.show()
 
+def phase_diagram_dx(filename1, filename2):
+    """
+    Construct a phase diagram of the mean longitudinal displacement in traps
+    and in the bulk.
+    
+    Arguments:
+        filename1: filepath to trapping results
+        filename2: filepath to bulk results
+    """
+    # Read in and interpret data
+    X, Y, TDX = read_data(filename1)
+    X, Y, BDX = read_data(filename2)
+
+    # Define phase diagram plotting function
+    def plot(data, cmap, norm, title, label):
+        fig = plt.figure(figsize=[8, 6])
+        plt.title(f"{title}")
+        plt.pcolormesh(X, Y, data, cmap=cmap, norm=norm, shading='auto')
+        cbar = plt.colorbar(label=label)
+        plt.xlabel("$Pe_s$")
+        plt.ylabel("$Pe_f$")
+        plt.tight_layout()
+        return fig
+
+    # Generate trap labelling
+    title_T = "Mean longitudinal trap displacement"
+    label_T = r'$\langle \Delta x \rangle_t$'
+    norm_T = None
+    # Plot trap diagram
+    plot(TDX, 'rainbow', norm_T, title_T, label_T)
+
+    # Generate bulk labelling
+    title_B = "Mean longitudinal bulk displacement"
+    label_B = r'$\langle \Delta x \rangle_b$'
+    norm_B = None
+    # Plot bulk diagram
+    plot(BDX, 'rainbow', norm_B, title_B, label_B)
+
+    plt.show()
+
 def phase_diagram_beta_Deff(filename):
     """
     Construct a phase diagram of the variance scaling exponent and the effective diffusivity.
@@ -296,6 +336,15 @@ def phase_diagram_beta_Deff(filename):
 
     plt.show()
 
+def read_data(filename):
+    x, y, data = np.loadtxt(filename, unpack=True)
+    nx, ny = np.unique(x), np.unique(y)
+    size_x = len(nx)
+    size_y = len(ny)
+    DATA = data.reshape(size_x, size_y).T
+    X, Y = np.meshgrid(nx, ny)
+    return X, Y, DATA
+    
 def phase_diagram_tau(filename):
     """
     Construct a phase diagram of tau for the trapping and bulk time distributions.
@@ -361,25 +410,16 @@ def phase_diagram_tau(filename):
 
     plt.plot(Ps_list, Pf_list, color='black', label='$Pe_s = Pe_f$')
     plt.scatter(Ps_ratio_1, Pf_ratio_1, marker='+', color='black', s=20, label=r'$0.5 \leq \tau_t/\tau_b < 1.5$')
-
     plt.legend()
     plt.tight_layout()
+
     plt.show()
 
 def pd3_comparison():
     """
     Plot side-by-side phase diagram comparisons for three datasets
     """
-    # Define data reading function
-    def read_data(filename):
-        x, y, data = np.loadtxt(filename, unpack=True)
-        nx, ny = np.unique(x), np.unique(y)
-        size_x = len(nx)
-        size_y = len(ny)
-        DATA = data.reshape(size_x, size_y).T
-        X, Y = np.meshgrid(nx, ny)
-        return X, Y, DATA
-
+    # Define alternative data reading function
     def read_data2(filename):
         x, y, data1, data2 = np.loadtxt(filename, unpack=True)
         nx, ny = np.unique(x), np.unique(y)
@@ -903,6 +943,7 @@ if __name__ == "__main__":
     parser.add_argument('--PDalt', action='store_true', help='Construct the alternative phase diagram')
     parser.add_argument('--PD3', action='store_true', help='Compare the phase diagrams of systems with/without shear, vorticity')
     parser.add_argument('--PDX', action='store_true', help='Compare the phase diagrams of alpha for total and longitudinal displacement')
+    parser.add_argument('--PDDX', action='store_true', help='Construct the phase diagram of mean trap and bulk displacements')
     parser.add_argument('--PDVX', action='store_true', help='Construct a phase diagram for the mean longitudinal velocity only')
     parser.add_argument('--PDA', action='store_true', help='Construct a phase diagram for the MSD scaling exponent only')
     parser.add_argument('--PDt', action='store_true', help='Construct a phase diagram for trapping/bulk time decay constant only')
