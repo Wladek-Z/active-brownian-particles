@@ -288,8 +288,36 @@ def phase_diagram_dx(filename1, filename2):
     part1 = np.linspace(BDX.min(), 0, 4)
     part2 = np.linspace(0, BDX.max(), 4)[1:]
     ticks_B = np.append(part1, part2)
+
     # Plot bulk diagram
-    plot(BDX, 'rainbow', norm_B, title_B, label_B, ticks_B)
+    fig = plt.figure(figsize=[8, 6])
+    plt.title(f"{title_B}")
+    plt.pcolormesh(X, Y, BDX, cmap='bwr', norm=norm_B, shading='auto')
+    cbar = plt.colorbar(label=label_B)
+    cbar.set_ticks(ticks=ticks_B)
+    cbar.minorticks_off()
+    plt.xlabel("$Pe_s$")
+    plt.ylabel("$Pe_f$")
+
+    x, y, tau_ttd, tau_btd = np.loadtxt('tau_new2.txt', unpack=True)
+
+    # Mark unit ratio phase points
+    Ps_list = []
+    Pf_list = []
+    Ps_ratio_1 = []
+    Pf_ratio_1 = []
+    for i in range(len(x)):
+        if x[i] == y[i]:
+            Ps_list.append(x[i])
+            Pf_list.append(y[i])
+        if np.round(tau_ttd[i]/tau_btd[i], 0) == 1:
+            Ps_ratio_1.append(x[i])
+            Pf_ratio_1.append(y[i])
+
+    plt.plot(Ps_list, Pf_list, color='black', label='$Pe_s = Pe_f$')
+    plt.scatter(Ps_ratio_1, Pf_ratio_1, marker='+', color='black', s=20, label=r'$0.5 \leq \tau_t/\tau_b < 1.5$')
+    plt.legend()
+    plt.tight_layout()
 
     plt.show()
 
